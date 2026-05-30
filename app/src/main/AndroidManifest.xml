@@ -13,6 +13,9 @@
         tools:ignore="PhotoAndVideoPolicy" />
 
     <uses-permission android:name="android.permission.MANAGE_MEDIA"/>
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
@@ -50,6 +53,13 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Storage redirect automated testing" />
         </service>
+        <receiver
+            android:name=".receiver.TestCaseReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="me.fakerqu.test.storageredirection.TEST_CASE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
