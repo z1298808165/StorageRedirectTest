@@ -59,8 +59,8 @@ jobs:
           set -euo pipefail
           mkdir -p core
           TAG="$(gh release view --repo "$SRX_REPO" --json tagName -q .tagName)"
-          gh release download "$TAG" --repo "$SRX_REPO" --pattern '*zygisk*.zip' --dir core --clobber
-          test -n "$(find core -maxdepth 1 -name '*zygisk*.zip' -print -quit)"
+          gh release download "$TAG" --repo "$SRX_REPO" --pattern '*x86_64.zip' --dir core --clobber
+          test -n "$(find core -maxdepth 1 -name '*x86_64.zip' -print -quit)"
 
       - name: 构建 APK 并运行本地测试
         run: ./gradlew --no-daemon --stacktrace :app:testDebugUnitTest :media-file-api:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :media-file-api:assembleDebugAndroidTest
@@ -81,7 +81,7 @@ jobs:
             adb wait-for-device
             adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
             if [ "$INSTALL_ZYGISK_CORE" = "true" ]; then
-              MODULE_ZIP="$(find core -maxdepth 1 -name '*zygisk*.zip' -print -quit)"
+              MODULE_ZIP="$(find core -maxdepth 1 -name '*x86_64.zip' -print -quit)"
               if [ -z "$MODULE_ZIP" ]; then
                 echo "No Zygisk module zip was downloaded."
                 exit 1
