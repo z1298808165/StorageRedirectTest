@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ANDROID_API_LEVEL: 37
+  ANDROID_API_LEVEL: 36
   ANDROID_TARGET: google_apis
   ANDROID_ARCH: x86_64
   SRX_REPO: Kindness-Kismet/Storage-redirection-X-Public
@@ -78,7 +78,6 @@ jobs:
           heap-size: 1024M
           disable-animations: true
           emulator-boot-timeout: 1500
-          channel: canary
           script: |
             set -eu
             adb wait-for-device
