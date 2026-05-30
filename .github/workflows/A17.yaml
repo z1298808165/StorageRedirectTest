@@ -15,14 +15,14 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ANDROID_API_LEVEL: 38
+  ANDROID_API_LEVEL: 36
   ANDROID_TARGET: google_apis
   ANDROID_ARCH: x86_64
   SRX_REPO: Kindness-Kismet/Storage-redirection-X-Public
 
 jobs:
   test:
-    name: Android 17 / API 38
+    name: Android 17 / API 37
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
