@@ -1,0 +1,132 @@
+name: A13
+
+on:
+  workflow_dispatch:
+    inputs:
+      install_zygisk_core:
+        description: 先用 rootAVD 安装 Magisk，再刷入最新版 Zygisk 核心
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: A13-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ANDROID_API_LEVEL: 33
+  ANDROID_TARGET: google_apis
+  ANDROID_ARCH: x86_64
+  INSTALL_ZYGISK_CORE: ${{ github.event_name == 'workflow_dispatch' && inputs.install_zygisk_core && 'true' || 'false' }}
+  SRX_REPO: Kindness-Kismet/Storage-redirection-X-Public
+
+jobs:
+  test:
+    name: Android 13 / API 33
+    runs-on: ubuntu-latest
+    timeout-minutes: 80
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v6
+
+      - name: 设置 JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 设置 Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: 设置 Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: 准备 Gradle Wrapper
+        run: chmod +x ./gradlew
+
+      - name: 下载最新版 Storage Redirect X 核心
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p core
+          TAG="$(gh release view --repo "$SRX_REPO" --json tagName -q .tagName)"
+          gh release download "$TAG" --repo "$SRX_REPO" --pattern '*zygisk*.zip' --dir core --clobber
+          test -n "$(find core -maxdepth 1 -name '*zygisk*.zip' -print -quit)"
+
+      - name: 构建 APK 并运行本地测试
+        run: ./gradlew --no-daemon --stacktrace :app:testDebugUnitTest :media-file-api:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :media-file-api:assembleDebugAndroidTest
+
+      - name: 运行模拟器测试
+        uses: reactivecircus/android-emulator-runner@v2.37.0
+        with:
+          api-level: ${{ env.ANDROID_API_LEVEL }}
+          target: ${{ env.ANDROID_TARGET }}
+          arch: ${{ env.ANDROID_ARCH }}
+          profile: pixel_7
+          disk-size: 4096M
+          heap-size: 1024M
+          disable-animations: true
+          emulator-boot-timeout: 900
+          script: |
+            set -euo pipefail
+            adb wait-for-device
+            adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+            if [ "$INSTALL_ZYGISK_CORE" = "true" ]; then
+              MODULE_ZIP="$(find core -maxdepth 1 -name '*zygisk*.zip' -print -quit)"
+              if [ -z "$MODULE_ZIP" ]; then
+                echo "No Zygisk module zip was downloaded."
+                exit 1
+              fi
+
+              ROOT_AVD_DIR="$RUNNER_TEMP/rootAVD"
+              git clone --depth 1 https://github.com/newbit1/rootAVD.git "$ROOT_AVD_DIR"
+              chmod +x "$ROOT_AVD_DIR/rootAVD.sh"
+
+              RAMDISK="$ANDROID_HOME/system-images/android-${ANDROID_API_LEVEL}/${ANDROID_TARGET}/${ANDROID_ARCH}/ramdisk.img"
+              if [ ! -f "$RAMDISK" ]; then
+                "$ROOT_AVD_DIR/rootAVD.sh" ListAllAVDs
+                echo "No ramdisk.img found at $RAMDISK."
+                exit 1
+              fi
+
+              printf '\n' | "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK"
+              adb wait-for-device
+              adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+              if ! adb shell su -c 'id' >/dev/null 2>&1; then
+                echo "Magisk root is not available after rootAVD. Use a self-hosted runner with a pre-rooted AVD snapshot for stable Zygisk tests."
+                exit 1
+              fi
+
+              adb shell su -c 'magisk --sqlite "REPLACE INTO settings (key,value) VALUES('"'"'zygisk'"'"',1);"'
+              adb shell mkdir -p /sdcard/Download
+              adb push "$MODULE_ZIP" /sdcard/Download/storage-redirect-x-zygisk.zip
+              adb shell su -c 'magisk --install-module /sdcard/Download/storage-redirect-x-zygisk.zip'
+              adb reboot
+              adb wait-for-device
+              adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+            fi
+            ./gradlew --no-daemon --stacktrace :app:connectedDebugAndroidTest :media-file-api:connectedDebugAndroidTest
+
+      - name: 上传测试产物
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: A13-artifacts
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            core/*.zip
+            app/build/outputs/apk/**/*.apk
+            app/build/reports/
+            app/build/outputs/androidTest-results/
+            media-file-api/build/reports/
+            media-file-api/build/outputs/androidTest-results/
