@@ -20,10 +20,36 @@ if [ ! -f "$RAMDISK" ]; then
   exit 1
 fi
 
+wait_for_boot() {
+  local timeout_seconds="${1:-300}"
+  local deadline=$((SECONDS + timeout_seconds))
+  local boot_completed=""
+
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    boot_completed="$(timeout 10s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+    if [ "$boot_completed" = "1" ]; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "Timed out waiting for emulator boot."
+  adb devices -l || true
+  return 1
+}
+
+start_emulator() {
+  local avd_name="${AVD_NAME:-test}"
+  local emulator_port="${EMULATOR_PORT:-5554}"
+  local emulator_log="${RUNNER_TEMP:-/tmp}/rooted-emulator.log"
+
+  nohup "$ANDROID_HOME/emulator/emulator" -port "$emulator_port" -avd "$avd_name" -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim >"$emulator_log" 2>&1 &
+}
+
 printf '\n' | "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
-adb reboot || true
-adb wait-for-device
-adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+adb kill-server >/dev/null 2>&1 || true
+start_emulator
+wait_for_boot 300
 
 if ! adb shell su -c 'id' >/dev/null 2>&1; then
   echo "Magisk root is not available after rootAVD."
@@ -35,8 +61,7 @@ adb shell mkdir -p /sdcard/Download
 adb push "$MODULE_ZIP" /sdcard/Download/storage-redirect-x.zip
 adb shell su -c 'magisk --install-module /sdcard/Download/storage-redirect-x.zip'
 adb reboot
-adb wait-for-device
-adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
+wait_for_boot 300
 
 if ! adb shell su -c 'magisk --sqlite "SELECT value FROM settings WHERE key='"'"'zygisk'"'"';"' | grep -q 1; then
   echo "Zygisk is not enabled after reboot."
