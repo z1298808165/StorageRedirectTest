@@ -78,6 +78,7 @@ jobs:
           heap-size: 1024M
           disable-animations: true
           emulator-boot-timeout: 1500
+          channel: canary
           script: |
             set -eu
             adb wait-for-device

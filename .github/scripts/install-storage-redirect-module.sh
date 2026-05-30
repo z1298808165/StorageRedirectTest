@@ -13,14 +13,15 @@ if [ ! -d "$ROOT_AVD_DIR" ]; then
 fi
 chmod +x "$ROOT_AVD_DIR/rootAVD.sh"
 
-RAMDISK="$ANDROID_HOME/system-images/android-${ANDROID_API_LEVEL}/${ANDROID_TARGET}/${ANDROID_ARCH}/ramdisk.img"
+RAMDISK_REL="system-images/android-${ANDROID_API_LEVEL}/${ANDROID_TARGET}/${ANDROID_ARCH}/ramdisk.img"
+RAMDISK="$ANDROID_HOME/$RAMDISK_REL"
 if [ ! -f "$RAMDISK" ]; then
-  "$ROOT_AVD_DIR/rootAVD.sh" ListAllAVDs
-  echo "No ramdisk.img found at $RAMDISK."
+  echo "No ramdisk.img found at expected Android SDK system image path."
   exit 1
 fi
 
-printf '\n' | "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK"
+printf '\n' | "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
+adb reboot || true
 adb wait-for-device
 adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done'
 
