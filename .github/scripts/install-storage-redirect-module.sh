@@ -51,10 +51,27 @@ adb kill-server >/dev/null 2>&1 || true
 start_emulator
 wait_for_boot 300
 
-if ! adb shell su -c 'id' >/dev/null 2>&1; then
-  echo "Magisk root is not available after rootAVD."
-  exit 1
-fi
+# 等待 Magisk 初始化
+echo "Waiting for Magisk to initialize..."
+sleep 10
+
+# 检查 Magisk 是否可用，最多重试 6 次
+for i in {1..6}; do
+  echo "Attempt $i: Checking Magisk root availability..."
+  if adb shell su -c 'id' >/dev/null 2>&1; then
+    echo "Magisk root is available."
+    break
+  fi
+  if [ "$i" -eq 6 ]; then
+    echo "Magisk root is not available after rootAVD."
+    adb shell getprop | grep -i magisk || true
+    adb shell ls -la /system/bin/su || true
+    adb shell ls -la /sbin || true
+    exit 1
+  fi
+  echo "Magisk not ready yet, waiting 10s..."
+  sleep 10
+done
 
 adb shell su -c 'magisk --sqlite "REPLACE INTO settings (key,value) VALUES('"'"'zygisk'"'"',1);"'
 adb shell mkdir -p /sdcard/Download
