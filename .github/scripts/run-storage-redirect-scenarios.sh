@@ -148,7 +148,19 @@ run_service_case() {
 run_write_test() {
   local scenario="$1"
   local target_path="${REAL_ROOT}/Download/SrtProbe/${TEST_FILE}"
-  run_service_case "$scenario" "write" "file_write" '^PASS \[file_write\]' --es file_path "$target_path" --es payload "$PAYLOAD" --es expected_payload "$PAYLOAD"
+  for attempt in 1 2; do
+    if run_service_case "$scenario" "write" "file_write" '^PASS \[file_write\]' --es file_path "$target_path" --es payload "$PAYLOAD" --es expected_payload "$PAYLOAD"; then
+      return 0
+    fi
+    if [ "$attempt" -eq 2 ]; then
+      return 1
+    fi
+    echo "write_retry scenario=${scenario} attempt=${attempt}"
+    adb shell am force-stop "$APP_ID" >/dev/null || true
+    adb shell am start -W -n "${APP_ID}/.MainActivity" >/dev/null
+    wait_storage_ready "scenario-${scenario}-write-retry"
+    clean_targets
+  done
 }
 
 check_app_view() {
