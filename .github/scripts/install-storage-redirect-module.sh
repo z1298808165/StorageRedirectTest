@@ -93,6 +93,14 @@ if ! ROOTAVD_NONINTERACTIVE=1 ROOTAVD_MAGISK_CHOICE=1 "$ROOT_AVD_DIR/rootAVD.sh"
   echo "rootAVD failed to patch the emulator ramdisk."
   exit 1
 fi
+
+AVD_DIR="${HOME}/.android/avd/${AVD_NAME:-test}.avd"
+PATCHED_RAMDISK="$ANDROID_HOME/$RAMDISK_REL"
+if [ -d "$AVD_DIR" ] && [ -f "$PATCHED_RAMDISK" ]; then
+  echo "Copying patched ramdisk into $AVD_DIR"
+  cp "$PATCHED_RAMDISK" "$AVD_DIR/ramdisk.img"
+fi
+
 wait_for_emulator_shutdown 90
 adb kill-server >/dev/null 2>&1 || true
 start_emulator
