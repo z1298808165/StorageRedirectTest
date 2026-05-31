@@ -13,7 +13,7 @@ PAYLOAD="storage-redirect-test:file:ci"
 
 adb_su() {
   local command="$1"
-  (adb shell su -c "$command" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command") | tr -d '\r'
+  (adb shell su -c "$command" || adb shell su 0 sh -c "$command" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command" || adb shell /debug_ramdisk/magisk su -c "$command") | tr -d '\r'
 }
 
 wait_boot_completed() {

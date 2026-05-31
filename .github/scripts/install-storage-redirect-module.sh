@@ -91,10 +91,10 @@ start_emulator() {
 
 adb_su() {
   local command="$1"
-  adb shell su -c "$command" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command"
+  adb shell su -c "$command" || adb shell su 0 sh -c "$command" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command" || adb shell /debug_ramdisk/magisk su -c "$command"
 }
 
-if ! ROOTAVD_NONINTERACTIVE=1 ROOTAVD_MAGISK_CHOICE=1 "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"; then
+if ! ROOTAVD_NONINTERACTIVE=1 ROOTAVD_MAGISK_CHOICE=1 "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL" PATCHFSTAB; then
   echo "rootAVD failed to patch the emulator ramdisk."
   exit 1
 fi
@@ -116,7 +116,7 @@ echo "Waiting for Magisk to initialize..."
 magisk_ready_attempts="${MAGISK_READY_ATTEMPTS:-3}"
 for i in $(seq 1 "$magisk_ready_attempts"); do
   echo "Attempt $i/$magisk_ready_attempts: Checking Magisk root availability..."
-  if adb_su 'id' >/dev/null 2>&1; then
+  if adb_su 'magisk -V >/dev/null && id' >/dev/null 2>&1; then
     echo "Magisk root is available."
     break
   fi
@@ -125,6 +125,7 @@ for i in $(seq 1 "$magisk_ready_attempts"); do
     adb shell getprop | grep -i magisk || true
     adb shell which su || true
     adb shell which magisk || true
+    adb shell su 0 sh -c 'id; ls -la /debug_ramdisk; find /debug_ramdisk -maxdepth 3 -name magisk -o -name su' || true
     adb shell ls -la /debug_ramdisk || true
     adb shell ls -la /dev | grep -i magisk || true
     adb shell find / -maxdepth 3 -name su -o -name magisk 2>/dev/null || true
