@@ -84,6 +84,11 @@ start_emulator() {
   fi
 }
 
+adb_su() {
+  local command="$1"
+  adb shell su -c "$command" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command"
+}
+
 ROOTAVD_NONINTERACTIVE=1 ROOTAVD_MAGISK_CHOICE=1 "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
 wait_for_emulator_shutdown 90
 adb kill-server >/dev/null 2>&1 || true
@@ -96,7 +101,7 @@ sleep 10
 magisk_ready_attempts="${MAGISK_READY_ATTEMPTS:-18}"
 for i in $(seq 1 "$magisk_ready_attempts"); do
   echo "Attempt $i/$magisk_ready_attempts: Checking Magisk root availability..."
-  if adb shell su -c 'id' >/dev/null 2>&1; then
+  if adb_su 'id' >/dev/null 2>&1; then
     echo "Magisk root is available."
     break
   fi
@@ -104,6 +109,7 @@ for i in $(seq 1 "$magisk_ready_attempts"); do
     echo "Magisk root is not available after rootAVD."
     adb shell getprop | grep -i magisk || true
     adb shell ls -la /system/bin/su || true
+    adb shell ls -la /system/bin/magisk || true
     adb shell ls -la /sbin || true
     exit 1
   fi
@@ -111,16 +117,16 @@ for i in $(seq 1 "$magisk_ready_attempts"); do
   sleep 10
 done
 
-adb shell su -c 'magisk --sqlite "REPLACE INTO settings (key,value) VALUES('"'"'zygisk'"'"',1);"'
+adb_su 'magisk --sqlite "REPLACE INTO settings (key,value) VALUES('"'"'zygisk'"'"',1);"'
 adb shell mkdir -p /sdcard/Download
 adb push "$MODULE_ZIP" /sdcard/Download/storage-redirect-x.zip
-adb shell su -c 'magisk --install-module /sdcard/Download/storage-redirect-x.zip'
+adb_su 'magisk --install-module /sdcard/Download/storage-redirect-x.zip'
 adb reboot
 wait_for_boot 300
 
-if ! adb shell su -c 'magisk --sqlite "SELECT value FROM settings WHERE key='"'"'zygisk'"'"';"' | grep -q 1; then
+if ! adb_su 'magisk --sqlite "SELECT value FROM settings WHERE key='"'"'zygisk'"'"';"' | grep -q 1; then
   echo "Zygisk is not enabled after reboot."
   exit 1
 fi
 
-adb shell su -c 'ls /data/adb/modules | grep -i "storage"' >/dev/null
+adb_su 'ls /data/adb/modules | grep -i "storage"' >/dev/null
