@@ -63,7 +63,8 @@ expected_prefix() {
   case "$1" in
     1|5) echo "${REAL_ROOT}/Download/SrtProbe/" ;;
     2) echo "${PRIVATE_ROOT}/Download/SrtProbe/" ;;
-    3|4) echo "${REAL_ROOT}/Download/Test/" ;;
+    3) echo "${PRIVATE_ROOT}/Download/Test/" ;;
+    4) echo "${REAL_ROOT}/Download/Test/" ;;
   esac
 }
 
@@ -79,8 +80,12 @@ scenario_title() {
 
 clean_targets() {
   adb_su "for dir in '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download'; do find \"\$dir\" -maxdepth 1 -name '$TEST_FILE' -delete 2>/dev/null || true; done" >/dev/null
-  adb_su "rm -rf '$RESULT_DIR' '$INTERNAL_RESULT_DIR'" >/dev/null
+  clean_results
   adb_su "mkdir -p '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download'; chmod 777 '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download' 2>/dev/null || true" >/dev/null
+}
+
+clean_results() {
+  adb_su "rm -rf '$RESULT_DIR' '$INTERNAL_RESULT_DIR'" >/dev/null
 }
 
 latest_result() {
@@ -111,24 +116,45 @@ print_storage_state() {
   adb_su "id; ls -ld /mnt/user/0 /mnt/user/0/emulated /mnt/user/0/emulated/0 /mnt/runtime/default/emulated/0 2>&1 || true; cat /proc/mounts | grep -E ' /storage|/mnt/runtime|/mnt/user|sdcard|fuse|srx' || true" || true
 }
 
-run_service_test() {
+run_service_case() {
   local scenario="$1"
-  local target_path="${REAL_ROOT}/Download/SrtProbe/${TEST_FILE}"
-  adb shell am start-foreground-service -n "${APP_ID}/.TestService" -a "$ACTION" --es test_case file_write --es file_path "$target_path" --es payload "$PAYLOAD" --es expected_payload "$PAYLOAD" >/dev/null
+  local label="$2"
+  local test_case="$3"
+  local pass_pattern="$4"
+  shift 4
+  local output_file="scenario-${scenario}-${label}-result.txt"
+
+  clean_results
+  adb shell am start-foreground-service -n "${APP_ID}/.TestService" -a "$ACTION" --es test_case "$test_case" "$@" >/dev/null
 
   local deadline=$((SECONDS + 45)) result_file=""
   while [ "$SECONDS" -lt "$deadline" ]; do
     result_file="$(latest_result)"
     if [ -n "$result_file" ]; then
-      adb_su "cat '$result_file'" | tee "scenario-${scenario}-result.txt"
-      grep -q '^PASS \[file_write\]' "scenario-${scenario}-result.txt"
+      adb_su "cat '$result_file'" | tee "$output_file"
+      cat "$output_file" >>"scenario-${scenario}-result.txt"
+      grep -q "$pass_pattern" "$output_file"
       return 0
     fi
     sleep 1
   done
 
-  echo "result_timeout scenario=${scenario}"
+  echo "result_timeout scenario=${scenario} test_case=${test_case}"
   return 1
+}
+
+run_write_test() {
+  local scenario="$1"
+  local target_path="${REAL_ROOT}/Download/SrtProbe/${TEST_FILE}"
+  run_service_case "$scenario" "write" "file_write" '^PASS \[file_write\]' --es file_path "$target_path" --es payload "$PAYLOAD" --es expected_payload "$PAYLOAD"
+}
+
+check_app_view() {
+  local scenario="$1"
+  local logical_dir="${REAL_ROOT}/Download/SrtProbe"
+  run_service_case "$scenario" "app-view" "file_list_dir" '^PASS \[file_list_dir\]' --es file_dir "$logical_dir"
+  echo "app_view scenario=${scenario} logical_dir=${logical_dir} expected_entry=${TEST_FILE}"
+  grep -q "entries=.*${TEST_FILE}" "scenario-${scenario}-app-view-result.txt"
 }
 
 find_written_file() {
@@ -162,22 +188,26 @@ print_diagnostics() {
 
 run_scenario() {
   scenario="$1"
-  echo "===== scenario ${scenario} ====="
-  echo "scenario ${scenario}: apply config"
+  : >"scenario-${scenario}-result.txt"
+  echo "step 1/7: 应用场景配置"
   apply_config "$scenario"
-  echo "scenario ${scenario}: restart app"
+  echo "step 2/7: 重启测试应用"
   adb shell am force-stop "$APP_ID" >/dev/null || true
   adb shell am start -W -n "${APP_ID}/.MainActivity" >/dev/null
   sleep 1
-  echo "scenario ${scenario}: wait storage"
+  echo "step 3/7: 等待共享存储可用"
   wait_storage_ready "scenario-${scenario}"
-  echo "scenario ${scenario}: clean targets"
+  echo "step 4/7: 清理测试目标"
   clean_targets
-  echo "scenario ${scenario}: run app write test"
-  if ! run_service_test "$scenario"; then
+  echo "step 5/7: 从应用进程写入文件"
+  if ! run_write_test "$scenario"; then
     return 1
   fi
-  echo "scenario ${scenario}: verify file location"
+  echo "step 6/7: 校验应用视角可见文件"
+  if ! check_app_view "$scenario"; then
+    return 1
+  fi
+  echo "step 7/7: 校验 root 视角物理落点"
   if ! check_file_location "$scenario"; then
     return 1
   fi
@@ -194,7 +224,7 @@ adb_su ": > '$LOG_PATH' 2>/dev/null || true" >/dev/null
 
 fail=0
 export APP_ID CONFIG LOG_PATH ACTION RESULT_DIR INTERNAL_RESULT_DIR REAL_ROOT PRIVATE_ROOT TEST_FILE PAYLOAD
-export -f adb_root adb_su wait_boot_completed write_config apply_config expected_prefix scenario_title clean_targets latest_result wait_storage_ready print_storage_state run_service_test find_written_file check_file_location check_health print_diagnostics run_scenario
+export -f adb_root adb_su wait_boot_completed write_config apply_config expected_prefix scenario_title clean_targets clean_results latest_result wait_storage_ready print_storage_state run_service_case run_write_test check_app_view find_written_file check_file_location check_health print_diagnostics run_scenario
 
 for scenario in 1 2 3 4 5; do
   echo "::group::scenario ${scenario}: $(scenario_title "$scenario")"

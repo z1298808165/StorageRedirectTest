@@ -29,11 +29,16 @@ class FileTestCases(private val context: Context) {
             )
         }
         val listed = api.getDirFilesRecursive(dir.absolutePath)
+        val entries = listed
+            .map { file -> file.relativeTo(dir).path.ifBlank { "." } }
+            .sorted()
+            .take(MAX_LISTED_ENTRIES)
         TestCase.FILE_LIST_DIR.pass(
             message = "list completed",
             metadata = mapOf(
                 "path" to dirPath,
                 "listedCount" to listed.size.toString(),
+                "entries" to entries.joinToString("|"),
             ),
         )
     }
@@ -136,6 +141,10 @@ class FileTestCases(private val context: Context) {
     }
 
     private fun pathMetadata(path: String): Map<String, String> = mapOf("path" to path)
+
+    companion object {
+        private const val MAX_LISTED_ENTRIES = 40
+    }
 }
 
 private fun TestCaseArgs.requireFilePath(testCase: TestCase): String? = filePath
