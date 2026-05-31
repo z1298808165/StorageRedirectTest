@@ -9,9 +9,10 @@ fi
 
 ROOT_AVD_DIR="$RUNNER_TEMP/rootAVD"
 if [ ! -d "$ROOT_AVD_DIR" ]; then
-  git clone --depth 1 https://github.com/newbit1/rootAVD.git "$ROOT_AVD_DIR"
+  git clone --depth 1 https://gitlab.com/newbit/rootAVD.git "$ROOT_AVD_DIR"
 fi
 chmod +x "$ROOT_AVD_DIR/rootAVD.sh"
+ROOT_AVD_MAGISK_CHOICE="${ROOT_AVD_MAGISK_CHOICE:-2}"
 
 RAMDISK_REL="system-images/android-${ANDROID_API_LEVEL}/${ANDROID_TARGET}/${ANDROID_ARCH}/ramdisk.img"
 RAMDISK="$ANDROID_HOME/$RAMDISK_REL"
@@ -71,24 +72,23 @@ start_emulator() {
   fi
 }
 
-printf '\n' | "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
+printf '%s\n' "$ROOT_AVD_MAGISK_CHOICE" | "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
 wait_for_emulator_shutdown 90
 adb kill-server >/dev/null 2>&1 || true
 start_emulator
 wait_for_boot 300
 
-# 等待 Magisk 初始化
 echo "Waiting for Magisk to initialize..."
 sleep 10
 
-# 检查 Magisk 是否可用，最多重试 6 次
-for i in {1..6}; do
-  echo "Attempt $i: Checking Magisk root availability..."
+magisk_ready_attempts="${MAGISK_READY_ATTEMPTS:-18}"
+for i in $(seq 1 "$magisk_ready_attempts"); do
+  echo "Attempt $i/$magisk_ready_attempts: Checking Magisk root availability..."
   if adb shell su -c 'id' >/dev/null 2>&1; then
     echo "Magisk root is available."
     break
   fi
-  if [ "$i" -eq 6 ]; then
+  if [ "$i" -eq "$magisk_ready_attempts" ]; then
     echo "Magisk root is not available after rootAVD."
     adb shell getprop | grep -i magisk || true
     adb shell ls -la /system/bin/su || true
