@@ -111,6 +111,42 @@ grant_magisk_shell() {
   adb_magisk "--sqlite \"REPLACE INTO policies (uid,policy,until,logging,notification) VALUES(2000,2,0,1,0);\"" >/dev/null 2>&1 || true
 }
 
+install_storage_redirect_module() {
+  local installer="${RUNNER_TEMP:-/tmp}/install-srx-module.sh"
+
+  adb push "$MODULE_ZIP" /data/local/tmp/storage-redirect-x.zip
+  if adb_magisk '--install-module /data/local/tmp/storage-redirect-x.zip'; then
+    return 0
+  fi
+
+  echo "Magisk module installer unavailable; installing module files directly."
+  cat >"$installer" <<'SRX_INSTALL'
+#!/system/bin/sh
+set -eu
+
+ZIPFILE=/data/local/tmp/storage-redirect-x.zip
+MODPATH=/data/adb/modules/storage.redirect.x
+
+ui_print() { echo "$1"; }
+set_perm_recursive() {
+  chown -R "$2:$3" "$1" 2>/dev/null || true
+  find "$1" -type d -exec chmod "$4" {} +
+  find "$1" -type f -exec chmod "$5" {} +
+}
+
+rm -rf "$MODPATH" /data/adb/modules_update/storage.redirect.x
+mkdir -p "$MODPATH"
+unzip -o "$ZIPFILE" customize.sh -d "$MODPATH" >/dev/null
+export ZIPFILE MODPATH
+cd "$MODPATH"
+. "$MODPATH/customize.sh"
+rm -f "$MODPATH/remove" "$MODPATH/disable" "$MODPATH/update"
+SRX_INSTALL
+
+  adb push "$installer" /data/local/tmp/install-srx-module.sh
+  adb_root 'chmod 755 /data/local/tmp/install-srx-module.sh && sh /data/local/tmp/install-srx-module.sh'
+}
+
 if ! ROOTAVD_NONINTERACTIVE=1 ROOTAVD_MAGISK_CHOICE=1 "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"; then
   echo "rootAVD failed to patch the emulator ramdisk."
   exit 1
@@ -158,8 +194,7 @@ for i in $(seq 1 "$magisk_ready_attempts"); do
 done
 
 adb_magisk "--sqlite \"REPLACE INTO settings (key,value) VALUES('zygisk',1);\""
-adb push "$MODULE_ZIP" /data/local/tmp/storage-redirect-x.zip
-adb_magisk '--install-module /data/local/tmp/storage-redirect-x.zip'
+install_storage_redirect_module
 adb reboot
 wait_for_boot 300
 
