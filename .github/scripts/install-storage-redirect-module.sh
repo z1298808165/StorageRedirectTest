@@ -35,18 +35,44 @@ wait_for_boot() {
 
   echo "Timed out waiting for emulator boot."
   adb devices -l || true
+  if [ -n "${EMULATOR_LOG:-}" ] && [ -f "$EMULATOR_LOG" ]; then
+    echo "=== emulator log tail ==="
+    tail -200 "$EMULATOR_LOG" || true
+  fi
+  return 1
+}
+
+wait_for_emulator_shutdown() {
+  local timeout_seconds="${1:-60}"
+  local deadline=$((SECONDS + timeout_seconds))
+
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if ! adb devices | grep -q '^emulator-'; then
+      return 0
+    fi
+    adb emu kill >/dev/null 2>&1 || true
+    sleep 2
+  done
+
+  echo "Timed out waiting for previous emulator shutdown."
+  adb devices -l || true
   return 1
 }
 
 start_emulator() {
   local avd_name="${AVD_NAME:-test}"
   local emulator_port="${EMULATOR_PORT:-5554}"
-  local emulator_log="${RUNNER_TEMP:-/tmp}/rooted-emulator.log"
+  EMULATOR_LOG="${RUNNER_TEMP:-/tmp}/rooted-emulator.log"
 
-  nohup "$ANDROID_HOME/emulator/emulator" -port "$emulator_port" -avd "$avd_name" -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim >"$emulator_log" 2>&1 &
+  nohup "$ANDROID_HOME/emulator/emulator" -port "$emulator_port" -avd "$avd_name" -no-window -gpu swiftshader_indirect -no-snapshot-load -no-snapshot-save -noaudio -no-boot-anim >"$EMULATOR_LOG" 2>&1 &
+  sleep 5
+  if [ -f "$EMULATOR_LOG" ]; then
+    tail -80 "$EMULATOR_LOG" || true
+  fi
 }
 
 printf '\n' | "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
+wait_for_emulator_shutdown 90
 adb kill-server >/dev/null 2>&1 || true
 start_emulator
 wait_for_boot 300
