@@ -114,39 +114,17 @@ grant_magisk_shell() {
 }
 
 install_storage_redirect_module() {
-  local installer="${RUNNER_TEMP:-/tmp}/install-srx-module.sh"
-
   adb push "$MODULE_ZIP" /data/local/tmp/storage-redirect-x.zip
-  if adb_magisk '--install-module /data/local/tmp/storage-redirect-x.zip'; then
-    return 0
+
+  if adb_root 'magisk --install-module /data/local/tmp/storage-redirect-x.zip'; then
+    adb_root 'rm -f /data/local/tmp/storage-redirect-x.zip' >/dev/null 2>&1 || true
+    return
   fi
 
-  echo "Magisk module installer unavailable; installing module files directly."
-  cat >"$installer" <<'SRX_INSTALL'
-#!/system/bin/sh
-set -eu
-
-ZIPFILE=/data/local/tmp/storage-redirect-x.zip
-MODPATH=/data/adb/modules/storage.redirect.x
-
-ui_print() { echo "$1"; }
-set_perm_recursive() {
-  chown -R "$2:$3" "$1" 2>/dev/null || true
-  find "$1" -type d -exec chmod "$4" {} +
-  find "$1" -type f -exec chmod "$5" {} +
-}
-
-rm -rf "$MODPATH" /data/adb/modules_update/storage.redirect.x
-mkdir -p "$MODPATH"
-unzip -o "$ZIPFILE" customize.sh -d "$MODPATH" >/dev/null
-export ZIPFILE MODPATH
-cd "$MODPATH"
-. "$MODPATH/customize.sh"
-rm -f "$MODPATH/remove" "$MODPATH/disable" "$MODPATH/update"
-SRX_INSTALL
-
-  adb push "$installer" /data/local/tmp/install-srx-module.sh
-  adb_root 'chmod 755 /data/local/tmp/install-srx-module.sh && sh /data/local/tmp/install-srx-module.sh'
+  echo "Magisk module install failed."
+  adb_root 'id; command -v magisk || true; magisk -V || true; ls -la /data/adb; ls -la /data/adb/magisk; ls -la /data/adb/modules; ls -la /data/adb/modules_update' || true
+  adb logcat -d -t 300 | grep -Ei 'magisk|zygisk|avc: denied|storage.redirect' || true
+  exit 1
 }
 
 install_test_app_before_module_boot() {
@@ -159,11 +137,21 @@ install_test_app_before_module_boot() {
 }
 
 seed_storage_redirect_config() {
-  local config="/data/adb/modules/storage.redirect.x/config/apps/${APP_ID}.json"
+  local config_content='{"users":{"0":{"enabled":true}}}'
 
-  adb_root "mkdir -p /data/adb/modules/storage.redirect.x/config/apps"
-  printf '{"users":{"0":{"enabled":true}}}' | adb_root "cat > '$config'"
-  adb_root "chmod 644 '$config'"
+  for module_dir in /data/adb/modules_update/storage.redirect.x /data/adb/modules/storage.redirect.x; do
+    if adb_root "[ -d '$module_dir' ]"; then
+      adb_root "mkdir -p '$module_dir/config/apps'"
+      printf '%s' "$config_content" | adb_root "cat > '$module_dir/config/apps/${APP_ID}.json'"
+      adb_root "chmod 644 '$module_dir/config/apps/${APP_ID}.json'"
+    fi
+  done
+}
+
+verify_storage_redirect_module_loaded() {
+  adb_su "test -d /data/adb/modules/storage.redirect.x && test ! -e /data/adb/modules/storage.redirect.x/disable"
+  adb_su "grep -q ' /dev/srx_config ' /proc/mounts"
+  adb_su "ls -la /data/adb/modules/storage.redirect.x/logs; ls -la /dev/srx_config"
 }
 
 install_test_app_before_module_boot
@@ -225,4 +213,4 @@ if ! adb_magisk "--sqlite \"SELECT value FROM settings WHERE key='zygisk';\"" | 
   exit 1
 fi
 
-adb_su 'ls /data/adb/modules | grep -i "storage"' >/dev/null
+verify_storage_redirect_module_loaded
