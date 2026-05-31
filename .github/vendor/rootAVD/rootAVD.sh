@@ -79,6 +79,12 @@ copyARCHfiles() {
 
 	cd $BINDIR
 		for file in lib*.so; do mv "$file" "${file:3:${#file}-6}"; done
+		if [ -e magisk ] && [ ! -e magisk64 ] && $IS64BIT; then
+			cp magisk magisk64
+		fi
+		if [ -e magisk ] && [ ! -e magisk32 ] && ! $IS64BIT; then
+			cp magisk magisk32
+		fi
 	cd $BASEDIR
 	echo "[-] copy all $ABI files from $BINDIR to $BASEDIR"
 	cp $BINDIR/* $BASEDIR 2>/dev/null
@@ -1067,7 +1073,7 @@ CheckAvailableMagisks() {
 				cat $MAGISK_MENU
 				if [ -n "${ROOTAVD_MAGISK_CHOICE:-}" ]; then
 					choice="$ROOTAVD_MAGISK_CHOICE"
-				elif [ "${ROOTAVD_NONINTERACTIVE:-}" = "1" ]; then
+				elif [ "${ROOTAVD_NONINTERACTIVE:-}" = "1" ] || [ ! -t 0 ]; then
 					choice=1
 				else
 					read -t "${ROOTAVD_MAGISK_MENU_TIMEOUT:-10}" choice || choice=""
