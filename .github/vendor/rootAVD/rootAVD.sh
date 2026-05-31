@@ -1716,7 +1716,7 @@ patching_ramdisk(){
 	done
 	cat > rootavd-magisk-data.rc <<'EOF'
 on post-fs-data
-    exec u:r:su:s0 root root -- /debug_ramdisk/busybox sh /debug_ramdisk/rootavd-magisk-data.sh
+    exec_background u:r:su:s0 root root -- /debug_ramdisk/busybox sh /debug_ramdisk/rootavd-magisk-data.sh
 EOF
 	cat > rootavd-magisk-data.sh <<'EOF'
 #!/debug_ramdisk/busybox sh
@@ -1730,6 +1730,13 @@ done
 chmod 755 "$dst"/magisk "$dst"/magiskinit "$dst"/init-ld "$dst"/magiskboot "$dst"/magiskpolicy "$dst"/busybox 2>/dev/null
 chmod 644 "$dst"/util_functions.sh "$dst"/module_installer.sh 2>/dev/null
 restorecon -R "$dst" 2>/dev/null
+
+for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+	"$src/magisk" --sqlite "REPLACE INTO settings (key,value) VALUES('root_access',3);" >/dev/null 2>&1 &&
+	"$src/magisk" --sqlite "REPLACE INTO policies (uid,policy,until,logging,notification) VALUES(2000,2,0,1,0);" >/dev/null 2>&1 &&
+	exit 0
+	sleep 1
+done
 EOF
 
 	if $STUBAPK; then
