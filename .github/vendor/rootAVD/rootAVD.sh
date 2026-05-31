@@ -2344,10 +2344,6 @@ done
 chmod 755 \$MAGISKTMP/busybox
 \$MAGISKTMP/busybox --install -s \$MAGISKTMP
 
-\$MAGISKTMP/magisk --sqlite \"REPLACE INTO settings (key,value) VALUES('root_access',3);\" >/dev/null 2>&1 || true
-\$MAGISKTMP/magisk --sqlite \"REPLACE INTO policies (uid,package_name,policy,until,logging,notification) VALUES(2000,'com.android.shell',2,0,1,0);\" >/dev/null 2>&1 || \
-  \$MAGISKTMP/magisk --sqlite \"REPLACE INTO policies (uid,policy,until,logging,notification) VALUES(2000,2,0,1,0);\" >/dev/null 2>&1 || true
-
 # create symlink / applet
 
 ln -s ./magisk \$MAGISKTMP/su 2>/dev/null
