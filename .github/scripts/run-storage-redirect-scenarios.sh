@@ -11,9 +11,14 @@ PRIVATE_ROOT="${REAL_ROOT}/Android/data/${APP_ID}/sdcard"
 TEST_FILE="srt_ci_probe.txt"
 PAYLOAD="storage-redirect-test:file:ci"
 
+adb_root() {
+  local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:\$PATH; $1"
+  adb shell su 0 sh -c "$command" || adb shell su -c "$command"
+}
+
 adb_su() {
   local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:\$PATH; $1"
-  (adb shell su -c "$command" || adb shell su 0 sh -c "$command" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command" || adb shell /debug_ramdisk/magisk su -c "$command") | tr -d '\r'
+  (adb_root "$1" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command" || adb shell /debug_ramdisk/magisk su -c "$command") | tr -d '\r'
 }
 
 wait_boot_completed() {
@@ -24,7 +29,7 @@ wait_boot_completed() {
 write_config() {
   local content="$1"
   adb_su "mkdir -p /data/adb/modules/storage.redirect.x/config/apps" >/dev/null
-  printf '%s' "$content" | adb shell su -c "cat > '$CONFIG'" >/dev/null
+  printf '%s' "$content" | adb shell su 0 sh -c "cat > '$CONFIG'" >/dev/null
 }
 
 apply_config() {
