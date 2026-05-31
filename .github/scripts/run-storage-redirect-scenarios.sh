@@ -12,7 +12,7 @@ TEST_FILE="srt_ci_probe.txt"
 PAYLOAD="storage-redirect-test:file:ci"
 
 adb_su() {
-  local command="$1"
+  local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:\$PATH; $1"
   (adb shell su -c "$command" || adb shell su 0 sh -c "$command" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command" || adb shell /debug_ramdisk/magisk su -c "$command") | tr -d '\r'
 }
 

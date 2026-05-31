@@ -90,8 +90,12 @@ start_emulator() {
 }
 
 adb_su() {
-  local command="$1"
+  local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:\$PATH; $1"
   adb shell su -c "$command" || adb shell su 0 sh -c "$command" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command" || adb shell /debug_ramdisk/magisk su -c "$command"
+}
+
+grant_magisk_shell() {
+  adb shell su 0 sh -c '/debug_ramdisk/magisk --sqlite "REPLACE INTO settings (key,value) VALUES('"'"'root_access'"'"',3);"; /debug_ramdisk/magisk --sqlite "REPLACE INTO policies (uid,policy,until,logging,notification) VALUES(2000,2,0,1,0);"' >/dev/null 2>&1 || true
 }
 
 if ! ROOTAVD_NONINTERACTIVE=1 ROOTAVD_MAGISK_CHOICE=1 "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"; then
@@ -116,6 +120,7 @@ echo "Waiting for Magisk to initialize..."
 magisk_ready_attempts="${MAGISK_READY_ATTEMPTS:-3}"
 for i in $(seq 1 "$magisk_ready_attempts"); do
   echo "Attempt $i/$magisk_ready_attempts: Checking Magisk root availability..."
+  grant_magisk_shell
   if adb_su 'magisk -V >/dev/null && id' >/dev/null 2>&1; then
     echo "Magisk root is available."
     break
