@@ -67,6 +67,16 @@ expected_prefix() {
   esac
 }
 
+scenario_title() {
+  case "$1" in
+    1) echo "未启用应用配置，验证默认真实路径写入" ;;
+    2) echo "启用重定向，验证写入应用私有空间" ;;
+    3) echo "启用路径映射，验证 SrtProbe 映射到 Test" ;;
+    4) echo "路径映射叠加真实路径放行，验证映射优先级" ;;
+    5) echo "放行真实 Download，验证保持原路径写入" ;;
+  esac
+}
+
 clean_targets() {
   adb_su "for dir in '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download'; do find \"\$dir\" -maxdepth 1 -name '$TEST_FILE' -delete 2>/dev/null || true; done" >/dev/null
   adb_su "rm -rf '$RESULT_DIR' '$INTERNAL_RESULT_DIR'" >/dev/null
@@ -180,9 +190,11 @@ adb_su ": > '$LOG_PATH' 2>/dev/null || true" >/dev/null
 
 fail=0
 for scenario in 1 2 3 4 5; do
+  echo "::group::scenario ${scenario}: $(scenario_title "$scenario")"
   if ! run_scenario "$scenario"; then
     fail=1
   fi
+  echo "::endgroup::"
 done
 check_health || fail=1
 
