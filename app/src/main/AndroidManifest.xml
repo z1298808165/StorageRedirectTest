@@ -47,7 +47,7 @@
         </activity>
         <service
             android:name=".TestService"
-            android:exported="false"
+            android:exported="true"
             android:foregroundServiceType="specialUse|mediaProcessing">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"

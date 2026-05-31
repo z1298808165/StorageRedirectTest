@@ -76,10 +76,10 @@ latest_result() {
   adb_su "ls -t '$RESULT_DIR'/result_*.txt 2>/dev/null | head -1" | tail -1
 }
 
-run_broadcast_test() {
+run_service_test() {
   local scenario="$1"
   local target_path="${REAL_ROOT}/Download/SrtProbe/${TEST_FILE}"
-  adb shell am broadcast --include-stopped-packages -n "${APP_ID}/.receiver.TestCaseReceiver" -a "$ACTION" --es test_case file_write --es file_path "$target_path" --es payload "$PAYLOAD" --es expected_payload "$PAYLOAD" >/dev/null
+  adb shell am start-foreground-service -n "${APP_ID}/.TestService" -a "$ACTION" --es test_case file_write --es file_path "$target_path" --es payload "$PAYLOAD" --es expected_payload "$PAYLOAD" >/dev/null
 
   local deadline=$((SECONDS + 45)) result_file=""
   while [ "$SECONDS" -lt "$deadline" ]; do
@@ -132,7 +132,7 @@ run_scenario() {
   adb shell am start -W -n "${APP_ID}/.MainActivity" >/dev/null
   sleep 1
   clean_targets
-  if ! run_broadcast_test "$scenario"; then
+  if ! run_service_test "$scenario"; then
     print_diagnostics "$scenario"
     return 1
   fi
