@@ -7,6 +7,8 @@ if [ -z "$MODULE_ZIP" ]; then
   exit 1
 fi
 
+APP_ID="${APP_ID:-me.fakerqu.test.storageredirect}"
+APP_APK="${APP_APK:-app/build/outputs/apk/debug/app-debug.apk}"
 ROOT_AVD_DIR="$RUNNER_TEMP/rootAVD"
 rm -rf "$ROOT_AVD_DIR"
 mkdir -p "$ROOT_AVD_DIR"
@@ -147,6 +149,25 @@ SRX_INSTALL
   adb_root 'chmod 755 /data/local/tmp/install-srx-module.sh && sh /data/local/tmp/install-srx-module.sh'
 }
 
+install_test_app_before_module_boot() {
+  if [ ! -f "$APP_APK" ]; then
+    echo "No test APK found at $APP_APK."
+    exit 1
+  fi
+
+  adb install -r "$APP_APK"
+}
+
+seed_storage_redirect_config() {
+  local config="/data/adb/modules/storage.redirect.x/config/apps/${APP_ID}.json"
+
+  adb_root "mkdir -p /data/adb/modules/storage.redirect.x/config/apps"
+  printf '{"users":{"0":{"enabled":true}}}' | adb_root "cat > '$config'"
+  adb_root "chmod 644 '$config'"
+}
+
+install_test_app_before_module_boot
+
 if ! ROOTAVD_NONINTERACTIVE=1 ROOTAVD_MAGISK_CHOICE=1 "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"; then
   echo "rootAVD failed to patch the emulator ramdisk."
   exit 1
@@ -195,6 +216,7 @@ done
 
 adb_magisk "--sqlite \"REPLACE INTO settings (key,value) VALUES('zygisk',1);\""
 install_storage_redirect_module
+seed_storage_redirect_config
 adb reboot
 wait_for_boot 300
 

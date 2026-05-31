@@ -120,8 +120,8 @@ check_health() {
 print_diagnostics() {
   local scenario="$1"
   echo "=== scenario ${scenario} diagnostics ==="
-  adb_su "echo ===config===; cat '$CONFIG' 2>/dev/null || true; echo; echo ===files===; find '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download' -maxdepth 1 -name '$TEST_FILE' -printf '%p %s %u:%g\\n' 2>/dev/null | sort; echo ===results===; cat '$RESULT_DIR'/result_*.txt 2>/dev/null || true; echo ===module_log===; tail -120 '$LOG_PATH' 2>/dev/null || true" || true
-  adb logcat -d -t 500 | grep -E 'StorageRedirectTest|SRX|FATAL EXCEPTION|AndroidRuntime|PhantomProcessRecord' | tail -120 || true
+  adb_su "echo ===config===; cat '$CONFIG' 2>/dev/null || true; echo; echo ===module_state===; ls -la /data/adb/modules/storage.redirect.x 2>/dev/null || true; echo; mount | grep -E 'srx|storage.redirect' || true; echo; echo ===logs===; for log in running.log app_status.log file_monitor.log media_provider_state.log; do echo ---\$log---; tail -80 /data/adb/modules/storage.redirect.x/logs/\$log 2>/dev/null || true; done; echo ===files===; find '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download' -maxdepth 1 -name '$TEST_FILE' -printf '%p %s %u:%g\\n' 2>/dev/null | sort; echo ===results===; cat '$RESULT_DIR'/result_*.txt 2>/dev/null || true" || true
+  adb logcat -d -t 800 | grep -Ei 'StorageRedirectTest|srx|StorageRedirect|Magisk|zygisk|FATAL EXCEPTION|AndroidRuntime|PhantomProcessRecord' | tail -180 || true
 }
 
 run_scenario() {
