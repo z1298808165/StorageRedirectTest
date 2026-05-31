@@ -12,7 +12,17 @@ if [ ! -d "$ROOT_AVD_DIR" ]; then
   git clone --depth 1 https://gitlab.com/newbit/rootAVD.git "$ROOT_AVD_DIR"
 fi
 chmod +x "$ROOT_AVD_DIR/rootAVD.sh"
-ROOT_AVD_MAGISK_CHOICE="${ROOT_AVD_MAGISK_CHOICE:-2}"
+
+MAGISK_JSON="${MAGISK_JSON:-https://raw.githubusercontent.com/topjohnwu/magisk-files/master/stable.json}"
+MAGISK_URL="$(python3 - <<PY
+import json
+import urllib.request
+
+with urllib.request.urlopen("$MAGISK_JSON", timeout=30) as response:
+    print(json.load(response)["magisk"]["link"])
+PY
+)"
+curl -fsSL "$MAGISK_URL" -o "$ROOT_AVD_DIR/Magisk.zip"
 
 RAMDISK_REL="system-images/android-${ANDROID_API_LEVEL}/${ANDROID_TARGET}/${ANDROID_ARCH}/ramdisk.img"
 RAMDISK="$ANDROID_HOME/$RAMDISK_REL"
@@ -72,7 +82,7 @@ start_emulator() {
   fi
 }
 
-printf '%s\n' "$ROOT_AVD_MAGISK_CHOICE" | "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
+printf '\n' | "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
 wait_for_emulator_shutdown 90
 adb kill-server >/dev/null 2>&1 || true
 start_emulator
