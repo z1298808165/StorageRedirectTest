@@ -75,9 +75,14 @@ wait_for_emulator_shutdown() {
 start_emulator() {
   local avd_name="${AVD_NAME:-test}"
   local emulator_port="${EMULATOR_PORT:-5554}"
+  local ramdisk_args=()
   EMULATOR_LOG="${RUNNER_TEMP:-/tmp}/rooted-emulator.log"
 
-  nohup "$ANDROID_HOME/emulator/emulator" -port "$emulator_port" -avd "$avd_name" -no-window -gpu swiftshader_indirect -no-snapshot-load -no-snapshot-save -noaudio -no-boot-anim >"$EMULATOR_LOG" 2>&1 &
+  if [ -n "${PATCHED_RAMDISK:-}" ] && [ -f "$PATCHED_RAMDISK" ]; then
+    ramdisk_args=(-ramdisk "$PATCHED_RAMDISK")
+  fi
+
+  nohup "$ANDROID_HOME/emulator/emulator" -port "$emulator_port" -avd "$avd_name" "${ramdisk_args[@]}" -no-window -gpu swiftshader_indirect -no-snapshot-load -no-snapshot-save -noaudio -no-boot-anim >"$EMULATOR_LOG" 2>&1 &
   sleep 5
   if [ -f "$EMULATOR_LOG" ]; then
     tail -80 "$EMULATOR_LOG" || true
