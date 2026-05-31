@@ -8,9 +8,11 @@ if [ -z "$MODULE_ZIP" ]; then
 fi
 
 ROOT_AVD_DIR="$RUNNER_TEMP/rootAVD"
-if [ ! -d "$ROOT_AVD_DIR" ]; then
-  git clone --depth 1 https://gitlab.com/newbit/rootAVD.git "$ROOT_AVD_DIR"
-fi
+rm -rf "$ROOT_AVD_DIR"
+mkdir -p "$ROOT_AVD_DIR"
+mkdir -p "$ROOT_AVD_DIR/Apps"
+cp .github/vendor/rootAVD/rootAVD.sh "$ROOT_AVD_DIR/rootAVD.sh"
+cp .github/vendor/rootAVD/rootAVD.bat "$ROOT_AVD_DIR/rootAVD.bat"
 chmod +x "$ROOT_AVD_DIR/rootAVD.sh"
 
 MAGISK_JSON="${MAGISK_JSON:-https://raw.githubusercontent.com/topjohnwu/magisk-files/master/stable.json}"
@@ -82,7 +84,7 @@ start_emulator() {
   fi
 }
 
-printf '\n' | "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
+ROOTAVD_NONINTERACTIVE=1 ROOTAVD_MAGISK_CHOICE=1 "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
 wait_for_emulator_shutdown 90
 adb kill-server >/dev/null 2>&1 || true
 start_emulator
