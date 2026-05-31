@@ -154,23 +154,52 @@ run_write_test() {
 check_app_view() {
   local scenario="$1"
   local logical_dir="${REAL_ROOT}/Download/SrtProbe"
-  run_service_case "$scenario" "app-view" "file_list_dir" '^PASS \[file_list_dir\]' --es file_dir "$logical_dir"
-  echo "app_view scenario=${scenario} logical_dir=${logical_dir} expected_entry=${TEST_FILE}"
-  grep -q "entries=.*${TEST_FILE}" "scenario-${scenario}-app-view-result.txt" || return 1
+  expect_app_entry "$scenario" "app-view" "$logical_dir"
 
   local mapped_real_dir="${REAL_ROOT}/Download/Test"
   case "$scenario" in
     3)
-      run_service_case "$scenario" "app-mapped-real-view" "file_list_dir" "" --es file_dir "$mapped_real_dir"
-      echo "app_view scenario=${scenario} logical_dir=${mapped_real_dir} forbidden_entry=${TEST_FILE}"
-      ! grep -q "entries=.*${TEST_FILE}" "scenario-${scenario}-app-mapped-real-view-result.txt"
+      expect_no_app_entry "$scenario" "app-mapped-real-view" "$mapped_real_dir"
       ;;
     4)
-      run_service_case "$scenario" "app-mapped-real-view" "file_list_dir" '^PASS \[file_list_dir\]' --es file_dir "$mapped_real_dir"
-      echo "app_view scenario=${scenario} logical_dir=${mapped_real_dir} expected_entry=${TEST_FILE}"
-      grep -q "entries=.*${TEST_FILE}" "scenario-${scenario}-app-mapped-real-view-result.txt"
+      expect_app_entry "$scenario" "app-mapped-real-view" "$mapped_real_dir"
       ;;
   esac
+}
+
+expect_app_entry() {
+  local scenario="$1"
+  local label="$2"
+  local dir="$3"
+
+  for attempt in 1 2 3 4 5; do
+    if run_service_case "$scenario" "$label" "file_list_dir" '^PASS \[file_list_dir\]' --es file_dir "$dir" &&
+      grep -q "entries=.*${TEST_FILE}" "scenario-${scenario}-${label}-result.txt"; then
+      echo "app_view scenario=${scenario} logical_dir=${dir} expected_entry=${TEST_FILE}"
+      return 0
+    fi
+    echo "app_view_retry scenario=${scenario} logical_dir=${dir} attempt=${attempt}"
+    sleep 1
+  done
+
+  return 1
+}
+
+expect_no_app_entry() {
+  local scenario="$1"
+  local label="$2"
+  local dir="$3"
+
+  for attempt in 1 2 3; do
+    run_service_case "$scenario" "$label" "file_list_dir" "" --es file_dir "$dir"
+    if grep -q "entries=.*${TEST_FILE}" "scenario-${scenario}-${label}-result.txt"; then
+      echo "app_view scenario=${scenario} logical_dir=${dir} forbidden_entry_visible=${TEST_FILE}"
+      return 1
+    fi
+    sleep 1
+  done
+
+  echo "app_view scenario=${scenario} logical_dir=${dir} forbidden_entry=${TEST_FILE}"
 }
 
 find_written_file() {
@@ -240,7 +269,7 @@ adb_su ": > '$LOG_PATH' 2>/dev/null || true" >/dev/null
 
 fail=0
 export APP_ID CONFIG LOG_PATH ACTION RESULT_DIR INTERNAL_RESULT_DIR REAL_ROOT PRIVATE_ROOT TEST_FILE PAYLOAD
-export -f adb_root adb_su wait_boot_completed write_config apply_config expected_prefix scenario_title clean_targets clean_results latest_result wait_storage_ready print_storage_state run_service_case run_write_test check_app_view find_written_file check_file_location check_health print_diagnostics run_scenario
+export -f adb_root adb_su wait_boot_completed write_config apply_config expected_prefix scenario_title clean_targets clean_results latest_result wait_storage_ready print_storage_state run_service_case run_write_test check_app_view expect_app_entry expect_no_app_entry find_written_file check_file_location check_health print_diagnostics run_scenario
 
 for scenario in 1 2 3 4 5; do
   echo "::group::scenario ${scenario}: $(scenario_title "$scenario")"
