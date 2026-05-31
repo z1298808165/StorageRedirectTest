@@ -163,18 +163,22 @@ print_diagnostics() {
 run_scenario() {
   scenario="$1"
   echo "===== scenario ${scenario} ====="
+  echo "scenario ${scenario}: apply config"
   apply_config "$scenario"
+  echo "scenario ${scenario}: restart app"
   adb shell am force-stop "$APP_ID" >/dev/null || true
   adb shell am start -W -n "${APP_ID}/.MainActivity" >/dev/null
   sleep 1
+  echo "scenario ${scenario}: wait storage"
   wait_storage_ready "scenario-${scenario}"
+  echo "scenario ${scenario}: clean targets"
   clean_targets
+  echo "scenario ${scenario}: run app write test"
   if ! run_service_test "$scenario"; then
-    print_diagnostics "$scenario"
     return 1
   fi
+  echo "scenario ${scenario}: verify file location"
   if ! check_file_location "$scenario"; then
-    print_diagnostics "$scenario"
     return 1
   fi
 }
@@ -189,9 +193,14 @@ wait_storage_ready "initial"
 adb_su ": > '$LOG_PATH' 2>/dev/null || true" >/dev/null
 
 fail=0
+export APP_ID CONFIG LOG_PATH ACTION RESULT_DIR INTERNAL_RESULT_DIR REAL_ROOT PRIVATE_ROOT TEST_FILE PAYLOAD
+export -f adb_root adb_su wait_boot_completed write_config apply_config expected_prefix scenario_title clean_targets latest_result wait_storage_ready print_storage_state run_service_test find_written_file check_file_location check_health print_diagnostics run_scenario
+
 for scenario in 1 2 3 4 5; do
   echo "::group::scenario ${scenario}: $(scenario_title "$scenario")"
-  if ! run_scenario "$scenario"; then
+  if ! timeout --foreground 240s bash -c 'run_scenario "$1"' _ "$scenario"; then
+    echo "scenario ${scenario}: failed or timed out"
+    timeout --foreground 90s bash -c 'print_diagnostics "$1"' _ "$scenario" || true
     fail=1
   fi
   echo "::endgroup::"
