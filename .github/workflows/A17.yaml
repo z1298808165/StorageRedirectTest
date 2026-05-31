@@ -2,6 +2,10 @@ name: A17
 
 on:
   workflow_dispatch:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
 
 permissions:
   contents: read
@@ -11,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ANDROID_API_LEVEL: 37
-  ANDROID_TARGET: google_apis
+  ANDROID_API_LEVEL: 37.0
+  ANDROID_TARGET: google_apis_ps16k
   ANDROID_ARCH: x86_64
   SRX_REPO: Kindness-Kismet/Storage-redirection-X-Public
 
@@ -23,40 +27,22 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      - name: 设置 Android SDK
-        uses: android-actions/setup-android@v4
-
-      - name: 检查 API 37 是否可用
-        run: |
-          set -euo pipefail
-          sdkmanager --list > sdkmanager-list.txt
-          platform="platforms;android-${ANDROID_API_LEVEL}"
-          image="system-images;android-${ANDROID_API_LEVEL};${ANDROID_TARGET};${ANDROID_ARCH}"
-          if grep -Fq "$platform" sdkmanager-list.txt && grep -Fq "$image" sdkmanager-list.txt; then
-            echo "A17_AVAILABLE=true" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          echo "A17_AVAILABLE=false" >> "$GITHUB_ENV"
-          echo "API ${ANDROID_API_LEVEL} is not available in the current Android SDK repository."
-          echo "Missing: $platform or $image"
-
       - name: 检出代码
-        if: env.A17_AVAILABLE == 'true'
         uses: actions/checkout@v6
 
       - name: 设置 JDK 21
-        if: env.A17_AVAILABLE == 'true'
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
 
+      - name: 设置 Android SDK
+        uses: android-actions/setup-android@v4
+
       - name: 设置 Gradle
-        if: env.A17_AVAILABLE == 'true'
         uses: gradle/actions/setup-gradle@v6
 
       - name: 启用 KVM 权限
-        if: env.A17_AVAILABLE == 'true'
         run: |
           set -euo pipefail
           if [ -e /dev/kvm ]; then
@@ -66,11 +52,9 @@ jobs:
           fi
 
       - name: 准备脚本
-        if: env.A17_AVAILABLE == 'true'
         run: chmod +x ./gradlew .github/scripts/*.sh
 
       - name: 下载最新版 Storage Redirect X 模块
-        if: env.A17_AVAILABLE == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -81,11 +65,9 @@ jobs:
           test -n "$(find core -maxdepth 1 -name '*x86_64.zip' -print -quit)"
 
       - name: 构建 APK 并运行本地测试
-        if: env.A17_AVAILABLE == 'true'
         run: ./gradlew --no-daemon --stacktrace :app:testDebugUnitTest :media-file-api:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :media-file-api:assembleDebugAndroidTest
 
       - name: 运行模拟器测试
-        if: env.A17_AVAILABLE == 'true'
         uses: reactivecircus/android-emulator-runner@v2.37.0
         with:
           api-level: ${{ env.ANDROID_API_LEVEL }}
@@ -106,7 +88,7 @@ jobs:
             bash .github/scripts/run-storage-redirect-scenarios.sh
 
       - name: 上传测试产物
-        if: always() && env.A17_AVAILABLE == 'true'
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: A17-artifacts
