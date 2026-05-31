@@ -158,9 +158,8 @@ for i in $(seq 1 "$magisk_ready_attempts"); do
 done
 
 adb_magisk "--sqlite \"REPLACE INTO settings (key,value) VALUES('zygisk',1);\""
-adb shell mkdir -p /sdcard/Download
-adb push "$MODULE_ZIP" /sdcard/Download/storage-redirect-x.zip
-adb_magisk '--install-module /sdcard/Download/storage-redirect-x.zip'
+adb push "$MODULE_ZIP" /data/local/tmp/storage-redirect-x.zip
+adb_magisk '--install-module /data/local/tmp/storage-redirect-x.zip'
 adb reboot
 wait_for_boot 300
 
