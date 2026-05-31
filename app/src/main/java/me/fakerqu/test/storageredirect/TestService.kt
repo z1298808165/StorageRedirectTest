@@ -10,11 +10,13 @@ import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import me.fakerqu.test.storageredirect.receiver.TestCaseReceiver
 import me.fakerqu.test.storageredirect.test.StorageRedirectTestRunner
 import me.fakerqu.test.storageredirect.test.TestCase
 import me.fakerqu.test.storageredirect.test.TestCaseArgs
+import me.fakerqu.test.storageredirect.test.TestResult
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -35,27 +37,38 @@ class TestService : Service() {
         promoteToForeground()
 
         if (intent?.action == TestCaseReceiver.ACTION_TEST_CASE) {
-            val testCase = TestCase.fromId(intent?.getStringExtra(TestCaseReceiver.EXTRA_TEST_CASE))
+            val testCase = TestCase.fromId(intent.getStringExtra(TestCaseReceiver.EXTRA_TEST_CASE))
             val args = TestCaseArgs.fromIntent(intent)
             executor.execute {
                 try {
-                    val results = StorageRedirectTestRunner(applicationContext).run(testCase, args)
+                    val results = try {
+                        StorageRedirectTestRunner(applicationContext).run(testCase, args)
+                    } catch (e: Throwable) {
+                        Log.e("StorageRedirectTest", "runner crashed", e)
+                        listOf(
+                            TestResult(
+                                testCase = testCase,
+                                passed = false,
+                                message = "runner crashed: ${e.javaClass.simpleName}",
+                                error = e.stackTraceToString(),
+                            )
+                        )
+                    }
                     val failed = results.count { !it.passed }
                     val resultDir = getExternalFilesDir("test_case_result")
-                    resultDir?.let {
-                        it.mkdirs()
-                        val resultFile = File(it, "result_${System.currentTimeMillis()}.txt")
-                        resultFile.bufferedWriter().use { writer ->
-                            results.forEach { result ->
-                                writer.write(result.toLogLine())
-                                writer.write("\n")
-                            }
-                            writer.flush()
+                        ?: File(filesDir, "test_case_result")
+                    resultDir.mkdirs()
+                    val resultFile = File(resultDir, "result_${System.currentTimeMillis()}.txt")
+                    resultFile.bufferedWriter().use { writer ->
+                        results.forEach { result ->
+                            writer.write(result.toLogLine())
+                            writer.write("\n")
                         }
+                        writer.flush()
                     }
 
                     if (failed > 0) {
-                        android.util.Log.w(
+                        Log.w(
                             "StorageRedirectTest",
                             "completed with $failed failure(s) out of ${results.size}"
                         )

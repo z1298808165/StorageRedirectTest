@@ -4,10 +4,15 @@ import android.content.Context
 import me.fakerqu.media_store_api.FileApiImpl
 import java.io.File
 
-class FileTestCases(context: Context) {
+class FileTestCases(private val context: Context) {
 
     private val api = FileApiImpl()
-    private val defaultRoot = File(context.getExternalFilesDir("srt_file_tests")!!, "workspace")
+    private val defaultRoot: File
+        get() = File(
+            context.getExternalFilesDir("srt_file_tests")
+                ?: error("external files dir unavailable"),
+            "workspace",
+        )
 
     fun listDir(args: TestCaseArgs): TestResult = TestCase.FILE_LIST_DIR.measure {
         val dirPath = args.fileDir ?: args.filePath

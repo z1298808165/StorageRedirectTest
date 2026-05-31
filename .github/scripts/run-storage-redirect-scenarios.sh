@@ -6,6 +6,7 @@ CONFIG="/data/adb/modules/storage.redirect.x/config/apps/${APP_ID}.json"
 LOG_PATH="/data/adb/modules/storage.redirect.x/logs/running.log"
 ACTION="me.fakerqu.test.storageredirection.TEST_CASE"
 RESULT_DIR="/sdcard/Android/data/${APP_ID}/files/test_case_result"
+INTERNAL_RESULT_DIR="/data/data/${APP_ID}/files/test_case_result"
 REAL_ROOT="/storage/emulated/0"
 PRIVATE_ROOT="${REAL_ROOT}/Android/data/${APP_ID}/sdcard"
 TEST_FILE="srt_ci_probe.txt"
@@ -68,12 +69,19 @@ expected_prefix() {
 
 clean_targets() {
   adb_su "for dir in '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download'; do find \"\$dir\" -maxdepth 1 -name '$TEST_FILE' -delete 2>/dev/null || true; done" >/dev/null
-  adb_su "rm -rf '$RESULT_DIR'" >/dev/null
+  adb_su "rm -rf '$RESULT_DIR' '$INTERNAL_RESULT_DIR'" >/dev/null
   adb_su "mkdir -p '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download'; chmod 777 '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download' 2>/dev/null || true" >/dev/null
 }
 
 latest_result() {
-  adb_su "ls -t '$RESULT_DIR'/result_*.txt 2>/dev/null | head -1" | tail -1
+  adb_su "ls -t '$RESULT_DIR'/result_*.txt '$INTERNAL_RESULT_DIR'/result_*.txt 2>/dev/null | head -1" | tail -1
+}
+
+print_storage_state() {
+  local label="$1"
+  echo "=== storage state: ${label} ==="
+  adb shell "date; getprop ro.build.version.sdk; getprop ro.build.version.release; getprop sys.boot_completed; getprop dev.bootcomplete; getprop init.svc.sdcard; getprop init.svc.media; sm list-volumes all 2>/dev/null || true; df -h /storage/emulated/0 /sdcard 2>&1 || true; ls -ld /storage /storage/emulated /storage/emulated/0 /sdcard 2>&1 || true; mount | grep -E ' /storage|/mnt/runtime|/mnt/user|sdcard|fuse|srx' || true" || true
+  adb_su "id; ls -ld /mnt/user/0 /mnt/user/0/emulated /mnt/user/0/emulated/0 /mnt/runtime/default/emulated/0 2>&1 || true; cat /proc/mounts | grep -E ' /storage|/mnt/runtime|/mnt/user|sdcard|fuse|srx' || true" || true
 }
 
 run_service_test() {
@@ -120,8 +128,9 @@ check_health() {
 print_diagnostics() {
   local scenario="$1"
   echo "=== scenario ${scenario} diagnostics ==="
-  adb_su "echo ===config===; cat '$CONFIG' 2>/dev/null || true; echo; echo ===module_state===; ls -la /data/adb/modules/storage.redirect.x 2>/dev/null || true; echo; mount | grep -E 'srx|storage.redirect' || true; echo; echo ===logs===; for log in running.log app_status.log file_monitor.log media_provider_state.log; do echo ---\$log---; tail -80 /data/adb/modules/storage.redirect.x/logs/\$log 2>/dev/null || true; done; echo ===files===; find '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download' -maxdepth 1 -name '$TEST_FILE' -printf '%p %s %u:%g\\n' 2>/dev/null | sort; echo ===results===; cat '$RESULT_DIR'/result_*.txt 2>/dev/null || true" || true
-  adb logcat -d -t 800 | grep -Ei 'StorageRedirectTest|srx|StorageRedirect|Magisk|zygisk|FATAL EXCEPTION|AndroidRuntime|PhantomProcessRecord' | tail -180 || true
+  print_storage_state "scenario-${scenario}-failure"
+  adb_su "echo ===config===; cat '$CONFIG' 2>/dev/null || true; echo; echo ===module_state===; ls -la /data/adb/modules/storage.redirect.x 2>/dev/null || true; echo; mount | grep -E 'srx|storage.redirect' || true; echo; echo ===logs===; for log in running.log app_status.log file_monitor.log media_provider_state.log; do echo ---\$log---; tail -80 /data/adb/modules/storage.redirect.x/logs/\$log 2>/dev/null || true; done; echo ===files===; find '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download' -maxdepth 1 -name '$TEST_FILE' -printf '%p %s %u:%g\\n' 2>/dev/null | sort; echo ===results===; cat '$RESULT_DIR'/result_*.txt '$INTERNAL_RESULT_DIR'/result_*.txt 2>/dev/null || true" || true
+  adb logcat -d -t 1200 | grep -Ei 'StorageRedirectTest|srx|StorageRedirect|Magisk|zygisk|FATAL EXCEPTION|AndroidRuntime|PhantomProcessRecord|ExternalStorage|StorageManager|MediaProvider|vold|sdcard|fuse|Transport endpoint' | tail -260 || true
 }
 
 run_scenario() {
@@ -131,7 +140,9 @@ run_scenario() {
   adb shell am force-stop "$APP_ID" >/dev/null || true
   adb shell am start -W -n "${APP_ID}/.MainActivity" >/dev/null
   sleep 1
+  print_storage_state "scenario-${scenario}-before-clean"
   clean_targets
+  print_storage_state "scenario-${scenario}-after-clean"
   if ! run_service_test "$scenario"; then
     print_diagnostics "$scenario"
     return 1
