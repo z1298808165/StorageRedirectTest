@@ -110,6 +110,12 @@ for i in $(seq 1 "$magisk_ready_attempts"); do
   if [ "$i" -eq "$magisk_ready_attempts" ]; then
     echo "Magisk root is not available after rootAVD."
     adb shell getprop | grep -i magisk || true
+    adb shell which su || true
+    adb shell which magisk || true
+    adb shell ls -la /debug_ramdisk || true
+    adb shell ls -la /dev | grep -i magisk || true
+    adb shell find / -maxdepth 3 -name su -o -name magisk 2>/dev/null || true
+    adb logcat -d -t 300 | grep -Ei 'magisk|magiskinit|init-ld|avc: denied|init:' || true
     adb shell ls -la /system/bin/su || true
     adb shell ls -la /system/bin/magisk || true
     adb shell ls -la /sbin || true

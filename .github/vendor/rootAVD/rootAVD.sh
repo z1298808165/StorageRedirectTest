@@ -1697,6 +1697,12 @@ patching_ramdisk(){
 	echo "KEEPVERITY=$KEEPVERITY" > config
 	echo "KEEPFORCEENCRYPT=$KEEPFORCEENCRYPT" >> config
 	echo "RECOVERYMODE=$RECOVERYMODE" >> config
+	echo "VENDORBOOT=false" >> config
+
+	if [ -e magisk ]; then
+		PREINITDEVICE=$($BASEDIR/magisk --preinit-device 2>/dev/null || true)
+		[ -n "$PREINITDEVICE" ] && echo "PREINITDEVICE=$PREINITDEVICE" >> config
+	fi
 
 	# actually here is the SHA of the bootimage generated
 	# we only have one file, so it could make sense
