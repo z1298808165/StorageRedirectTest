@@ -78,7 +78,7 @@ latest_result() {
 run_broadcast_test() {
   local scenario="$1"
   local target_path="${REAL_ROOT}/Download/SrtProbe/${TEST_FILE}"
-  adb shell am broadcast -a "$ACTION" --es test_case file_write --es file_path "$target_path" --es payload "$PAYLOAD" --es expected_payload "$PAYLOAD" >/dev/null
+  adb shell am broadcast --include-stopped-packages -n "${APP_ID}/.receiver.TestCaseReceiver" -a "$ACTION" --es test_case file_write --es file_path "$target_path" --es payload "$PAYLOAD" --es expected_payload "$PAYLOAD" >/dev/null
 
   local deadline=$((SECONDS + 45)) result_file=""
   while [ "$SECONDS" -lt "$deadline" ]; do
