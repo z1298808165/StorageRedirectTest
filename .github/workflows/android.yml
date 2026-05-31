@@ -1,4 +1,4 @@
-name: A16
+name: Android
 
 on:
   workflow_dispatch:
@@ -11,20 +11,35 @@ permissions:
   contents: read
 
 concurrency:
-  group: A16-${{ github.ref }}
+  group: Android-${{ github.ref }}
   cancel-in-progress: true
 
 env:
-  ANDROID_API_LEVEL: 36
   ANDROID_TARGET: google_apis
   ANDROID_ARCH: x86_64
   SRX_REPO: Kindness-Kismet/Storage-redirection-X-Public
 
 jobs:
   test:
-    name: Android 16 / API 36
+    name: Android ${{ matrix.android-version }} / API ${{ matrix.api-level }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      ANDROID_API_LEVEL: ${{ matrix.api-level }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - android-version: 12
+            api-level: 31
+          - android-version: 13
+            api-level: 33
+          - android-version: 14
+            api-level: 34
+          - android-version: 15
+            api-level: 35
+          - android-version: 16
+            api-level: 36
 
     steps:
       - name: 检出代码
@@ -70,7 +85,7 @@ jobs:
       - name: 运行模拟器测试
         uses: reactivecircus/android-emulator-runner@v2.37.0
         with:
-          api-level: ${{ env.ANDROID_API_LEVEL }}
+          api-level: ${{ matrix.api-level }}
           target: ${{ env.ANDROID_TARGET }}
           arch: ${{ env.ANDROID_ARCH }}
           profile: pixel_7
@@ -91,7 +106,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: A16-artifacts
+          name: A${{ matrix.android-version }}-artifacts
           if-no-files-found: ignore
           retention-days: 14
           path: |
