@@ -128,6 +128,8 @@ run_scenario() {
   echo "===== scenario ${scenario} ====="
   apply_config "$scenario"
   adb shell am force-stop "$APP_ID" >/dev/null || true
+  adb shell am start -W -n "${APP_ID}/.MainActivity" >/dev/null
+  sleep 1
   clean_targets
   if ! run_broadcast_test "$scenario"; then
     print_diagnostics "$scenario"
