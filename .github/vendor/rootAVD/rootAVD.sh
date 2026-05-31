@@ -1704,16 +1704,27 @@ patching_ramdisk(){
 
 	# Compress to save precious ramdisk space
 
-	if $IS32BITONLY || ! $IS64BITONLY ; then
-		$BASEDIR/magiskboot compress=xz magisk32 magisk32.xz
-	fi
+	if [ -e init-ld ]; then
+		$BASEDIR/magiskboot compress=xz magisk magisk.xz
+		$BASEDIR/magiskboot compress=xz init-ld init-ld.xz
+		SKIP32="#"
+		SKIP64="#"
+		SKIPMAGISK=""
+		SKIPINITLD=""
+	else
+		if $IS32BITONLY || ! $IS64BITONLY ; then
+			$BASEDIR/magiskboot compress=xz magisk32 magisk32.xz
+		fi
 
-	if $IS64BITONLY || ! $IS32BITONLY ; then
-		$BASEDIR/magiskboot compress=xz magisk64 magisk64.xz
-	fi
+		if $IS64BITONLY || ! $IS32BITONLY ; then
+			$BASEDIR/magiskboot compress=xz magisk64 magisk64.xz
+		fi
 
-	$IS64BITONLY && SKIP32="#" || SKIP32=""
-	$IS64BIT && SKIP64="" || SKIP64="#"
+		$IS64BITONLY && SKIP32="#" || SKIP32=""
+		$IS64BIT && SKIP64="" || SKIP64="#"
+		SKIPMAGISK="#"
+		SKIPINITLD="#"
+	fi
 
 	if $STUBAPK; then
 		echo "[!] stub.apk is present, compress and add it to ramdisk"
@@ -1734,9 +1745,11 @@ patching_ramdisk(){
 	echo "[!] patching the ramdisk with Magisk Init"
 	$BASEDIR/magiskboot cpio ramdisk.cpio \
 	"add 0750 init magiskinit" \
+	"$SKIPMAGISK add 0644 overlay.d/sbin/magisk.xz magisk.xz" \
 	"$SKIP32 add 0644 overlay.d/sbin/magisk32.xz magisk32.xz" \
 	"$SKIP64 add 0644 overlay.d/sbin/magisk64.xz magisk64.xz" \
 	"$SKIPSTUB add 0644 overlay.d/sbin/stub.xz stub.xz" \
+	"$SKIPINITLD add 0644 overlay.d/sbin/init-ld.xz init-ld.xz" \
 	"patch" \
 	"backup ramdisk.cpio.orig" \
 	"mkdir 000 .backup" \
