@@ -1711,12 +1711,26 @@ patching_ramdisk(){
 
 	$BASEDIR/magiskboot compress=xz magisk magisk.xz
 	$BASEDIR/magiskboot compress=xz init-ld init-ld.xz
-	for file in busybox magiskboot magiskpolicy; do
-		[ -f "$file" ] && $BASEDIR/magiskboot compress=xz "$file" "$file.xz"
-	done
 	for file in util_functions.sh module_installer.sh; do
-		[ -f "assets/$file" ] && cp "assets/$file" "$file" && $BASEDIR/magiskboot compress=xz "$file" "$file.xz"
+		[ -f "assets/$file" ] && cp "assets/$file" "$file"
 	done
+	cat > rootavd-magisk-data.rc <<'EOF'
+on post-fs-data
+    exec u:r:su:s0 root root -- /debug_ramdisk/busybox sh /debug_ramdisk/rootavd-magisk-data.sh
+EOF
+	cat > rootavd-magisk-data.sh <<'EOF'
+#!/debug_ramdisk/busybox sh
+src=/debug_ramdisk
+dst=/data/adb/magisk
+
+mkdir -p "$dst" /data/adb/modules /data/adb/post-fs-data.d /data/adb/service.d
+for file in magisk magiskinit init-ld magiskboot magiskpolicy busybox util_functions.sh module_installer.sh; do
+	[ -f "$src/$file" ] && cp -af "$src/$file" "$dst/$file"
+done
+chmod 755 "$dst"/magisk "$dst"/magiskinit "$dst"/init-ld "$dst"/magiskboot "$dst"/magiskpolicy "$dst"/busybox 2>/dev/null
+chmod 644 "$dst"/util_functions.sh "$dst"/module_installer.sh 2>/dev/null
+restorecon -R "$dst" 2>/dev/null
+EOF
 
 	if $STUBAPK; then
 		echo "[!] stub.apk is present, compress and add it to ramdisk"
@@ -1745,8 +1759,12 @@ patching_ramdisk(){
 	"mkdir 000 .backup" \
 	"add 000 .backup/.magisk config"
 
+	$BASEDIR/magiskboot cpio ramdisk.cpio \
+	"add 0644 overlay.d/rootavd-magisk-data.rc rootavd-magisk-data.rc" \
+	"add 0750 overlay.d/sbin/rootavd-magisk-data.sh rootavd-magisk-data.sh"
+
 	for file in busybox magiskboot magiskpolicy util_functions.sh module_installer.sh; do
-		[ -f "$file.xz" ] && $BASEDIR/magiskboot cpio ramdisk.cpio "add 0644 overlay.d/sbin/$file.xz $file.xz"
+		[ -f "$file" ] && $BASEDIR/magiskboot cpio ramdisk.cpio "add 0750 overlay.d/sbin/$file $file"
 	done
 }
 
