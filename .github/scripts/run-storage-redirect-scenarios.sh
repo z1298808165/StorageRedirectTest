@@ -78,9 +78,9 @@ scenario_title() {
 }
 
 clean_targets() {
-  adb_su "for dir in '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download'; do find \"\$dir\" -maxdepth 1 -name '$TEST_FILE' -delete 2>/dev/null || true; done" >/dev/null
+  adb_su "for dir in '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download'; do find \"\$dir\" -maxdepth 1 -name '$TEST_FILE' -delete 2>/dev/null || true; done" >/dev/null
   clean_results
-  adb_su "mkdir -p '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download'; chmod 777 '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download' 2>/dev/null || true" >/dev/null
+  adb_su "mkdir -p '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download'; chmod 777 '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download' 2>/dev/null || true" >/dev/null
 }
 
 clean_results() {
@@ -132,6 +132,9 @@ run_service_case() {
     if [ -n "$result_file" ]; then
       adb_su "cat '$result_file'" | tee "$output_file"
       cat "$output_file" >>"scenario-${scenario}-result.txt"
+      if [ -z "$pass_pattern" ]; then
+        return 0
+      fi
       grep -q "$pass_pattern" "$output_file"
       return 0
     fi
@@ -153,11 +156,25 @@ check_app_view() {
   local logical_dir="${REAL_ROOT}/Download/SrtProbe"
   run_service_case "$scenario" "app-view" "file_list_dir" '^PASS \[file_list_dir\]' --es file_dir "$logical_dir"
   echo "app_view scenario=${scenario} logical_dir=${logical_dir} expected_entry=${TEST_FILE}"
-  grep -q "entries=.*${TEST_FILE}" "scenario-${scenario}-app-view-result.txt"
+  grep -q "entries=.*${TEST_FILE}" "scenario-${scenario}-app-view-result.txt" || return 1
+
+  local mapped_real_dir="${REAL_ROOT}/Download/Test"
+  case "$scenario" in
+    3)
+      run_service_case "$scenario" "app-mapped-real-view" "file_list_dir" "" --es file_dir "$mapped_real_dir"
+      echo "app_view scenario=${scenario} logical_dir=${mapped_real_dir} forbidden_entry=${TEST_FILE}"
+      ! grep -q "entries=.*${TEST_FILE}" "scenario-${scenario}-app-mapped-real-view-result.txt"
+      ;;
+    4)
+      run_service_case "$scenario" "app-mapped-real-view" "file_list_dir" '^PASS \[file_list_dir\]' --es file_dir "$mapped_real_dir"
+      echo "app_view scenario=${scenario} logical_dir=${mapped_real_dir} expected_entry=${TEST_FILE}"
+      grep -q "entries=.*${TEST_FILE}" "scenario-${scenario}-app-mapped-real-view-result.txt"
+      ;;
+  esac
 }
 
 find_written_file() {
-  adb_su "for dir in '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download'; do find \"\$dir\" -maxdepth 1 -name '$TEST_FILE' -print 2>/dev/null || true; done | sort" | tail -1
+  adb_su "for dir in '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download'; do find \"\$dir\" -maxdepth 1 -name '$TEST_FILE' -print 2>/dev/null || true; done | sort" | tail -1
 }
 
 check_file_location() {
@@ -181,7 +198,7 @@ print_diagnostics() {
   local scenario="$1"
   echo "=== scenario ${scenario} diagnostics ==="
   print_storage_state "scenario-${scenario}-failure"
-  adb_su "echo ===config===; cat '$CONFIG' 2>/dev/null || true; echo; echo ===module_state===; ls -la /data/adb/modules/storage.redirect.x 2>/dev/null || true; echo; mount | grep -E 'srx|storage.redirect' || true; echo; echo ===logs===; for log in running.log app_status.log file_monitor.log media_provider_state.log; do echo ---\$log---; tail -80 /data/adb/modules/storage.redirect.x/logs/\$log 2>/dev/null || true; done; echo ===files===; find '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download' -maxdepth 1 -name '$TEST_FILE' -printf '%p %s %u:%g\\n' 2>/dev/null | sort; echo ===results===; cat '$RESULT_DIR'/result_*.txt '$INTERNAL_RESULT_DIR'/result_*.txt 2>/dev/null || true" || true
+  adb_su "echo ===config===; cat '$CONFIG' 2>/dev/null || true; echo; echo ===module_state===; ls -la /data/adb/modules/storage.redirect.x 2>/dev/null || true; echo; mount | grep -E 'srx|storage.redirect' || true; echo; echo ===logs===; for log in running.log app_status.log file_monitor.log media_provider_state.log; do echo ---\$log---; tail -80 /data/adb/modules/storage.redirect.x/logs/\$log 2>/dev/null || true; done; echo ===files===; find '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download' -maxdepth 1 -name '$TEST_FILE' -printf '%p %s %u:%g\\n' 2>/dev/null | sort; echo ===results===; cat '$RESULT_DIR'/result_*.txt '$INTERNAL_RESULT_DIR'/result_*.txt 2>/dev/null || true" || true
   adb logcat -d -t 1200 | grep -Ei 'StorageRedirectTest|srx|StorageRedirect|Magisk|zygisk|FATAL EXCEPTION|AndroidRuntime|PhantomProcessRecord|ExternalStorage|StorageManager|MediaProvider|vold|sdcard|fuse|Transport endpoint' | tail -260 || true
 }
 
