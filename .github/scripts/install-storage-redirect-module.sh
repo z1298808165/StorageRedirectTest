@@ -92,20 +92,21 @@ start_emulator() {
 }
 
 adb_root() {
-  local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:\$PATH; $1"
+  local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:/system_ext/bin:\$PATH; $1"
   local quoted
   quoted="$(printf '%s' "$command" | sed "s/'/'\\\\''/g")"
   adb shell "su 0 sh -c '$quoted'" || adb shell "su -c '$quoted'"
 }
 
 adb_su() {
-  local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:\$PATH; $1"
-  adb_root "$1" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command" || adb shell /debug_ramdisk/magisk su -c "$command"
+  local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:/system_ext/bin:\$PATH; $1"
+  adb_root "$1" || adb shell magisk su -c "$command" || adb shell /system_ext/bin/magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command" || adb shell /debug_ramdisk/magisk su -c "$command"
 }
 
 adb_magisk() {
   local args="$1"
-  adb_root "magisk_bin=''; for bin in /data/adb/magisk/magisk /debug_ramdisk/magisk /sbin/magisk /system/bin/magisk magisk; do if [ -x \"\$bin\" ]; then magisk_bin=\"\$bin\"; break; fi; found=\$(command -v \"\$bin\" 2>/dev/null || true); if [ -n \"\$found\" ]; then magisk_bin=\"\$found\"; break; fi; done; [ -n \"\$magisk_bin\" ] && \"\$magisk_bin\" $args"
+  local command="magisk_bin=''; for bin in /data/adb/magisk/magisk /debug_ramdisk/magisk /sbin/magisk /system_ext/bin/magisk /system/bin/magisk magisk; do if [ -x \"\$bin\" ]; then magisk_bin=\"\$bin\"; break; fi; found=\$(command -v \"\$bin\" 2>/dev/null || true); if [ -n \"\$found\" ]; then magisk_bin=\"\$found\"; break; fi; done; [ -n \"\$magisk_bin\" ] && \"\$magisk_bin\" $args"
+  adb shell "$command" || adb_root "$command"
 }
 
 grant_magisk_shell() {
