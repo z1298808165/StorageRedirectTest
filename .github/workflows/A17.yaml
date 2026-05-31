@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  ANDROID_API_LEVEL: 36
+  ANDROID_API_LEVEL: 37
   ANDROID_TARGET: google_apis
   ANDROID_ARCH: x86_64
   SRX_REPO: Kindness-Kismet/Storage-redirection-X-Public

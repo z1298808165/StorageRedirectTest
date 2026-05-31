@@ -77,6 +77,23 @@ latest_result() {
   adb_su "ls -t '$RESULT_DIR'/result_*.txt '$INTERNAL_RESULT_DIR'/result_*.txt 2>/dev/null | head -1" | tail -1
 }
 
+wait_storage_ready() {
+  local label="$1"
+  local timeout_seconds="${2:-90}"
+  local deadline=$((SECONDS + timeout_seconds))
+
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if adb shell "sm list-volumes all 2>/dev/null | grep -q 'emulated;0 mounted' && test -d '$REAL_ROOT'" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+
+  echo "Timed out waiting for emulated storage: ${label}"
+  print_storage_state "${label}-storage-timeout"
+  return 1
+}
+
 print_storage_state() {
   local label="$1"
   echo "=== storage state: ${label} ==="
@@ -140,9 +157,8 @@ run_scenario() {
   adb shell am force-stop "$APP_ID" >/dev/null || true
   adb shell am start -W -n "${APP_ID}/.MainActivity" >/dev/null
   sleep 1
-  print_storage_state "scenario-${scenario}-before-clean"
+  wait_storage_ready "scenario-${scenario}"
   clean_targets
-  print_storage_state "scenario-${scenario}-after-clean"
   if ! run_service_test "$scenario"; then
     print_diagnostics "$scenario"
     return 1
@@ -159,6 +175,7 @@ adb shell pm grant "$APP_ID" android.permission.WRITE_EXTERNAL_STORAGE >/dev/nul
 adb shell pm grant "$APP_ID" android.permission.READ_MEDIA_IMAGES >/dev/null 2>&1 || true
 adb shell pm grant "$APP_ID" android.permission.READ_MEDIA_VIDEO >/dev/null 2>&1 || true
 adb shell pm grant "$APP_ID" android.permission.READ_MEDIA_AUDIO >/dev/null 2>&1 || true
+wait_storage_ready "initial"
 adb_su ": > '$LOG_PATH' 2>/dev/null || true" >/dev/null
 
 fail=0
