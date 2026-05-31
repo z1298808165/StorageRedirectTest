@@ -79,12 +79,6 @@ copyARCHfiles() {
 
 	cd $BINDIR
 		for file in lib*.so; do mv "$file" "${file:3:${#file}-6}"; done
-		if [ -e magisk ] && [ ! -e magisk64 ] && $IS64BIT; then
-			cp magisk magisk64
-		fi
-		if [ -e magisk ] && [ ! -e magisk32 ] && ! $IS64BIT; then
-			cp magisk magisk32
-		fi
 	cd $BASEDIR
 	echo "[-] copy all $ABI files from $BINDIR to $BASEDIR"
 	cp $BINDIR/* $BASEDIR 2>/dev/null
@@ -1710,27 +1704,19 @@ patching_ramdisk(){
 
 	# Compress to save precious ramdisk space
 
-	if [ -e init-ld ]; then
-		$BASEDIR/magiskboot compress=xz magisk magisk.xz
-		$BASEDIR/magiskboot compress=xz init-ld init-ld.xz
-		SKIP32="#"
-		SKIP64="#"
-		SKIPMAGISK=""
-		SKIPINITLD=""
-	else
-		if $IS32BITONLY || ! $IS64BITONLY ; then
-			$BASEDIR/magiskboot compress=xz magisk32 magisk32.xz
-		fi
-
-		if $IS64BITONLY || ! $IS32BITONLY ; then
-			$BASEDIR/magiskboot compress=xz magisk64 magisk64.xz
-		fi
-
-		$IS64BITONLY && SKIP32="#" || SKIP32=""
-		$IS64BIT && SKIP64="" || SKIP64="#"
-		SKIPMAGISK="#"
-		SKIPINITLD="#"
+	if [ ! -e magisk ] || [ ! -e init-ld ]; then
+		echo "[!] Current workflow requires Magisk with magisk and init-ld payloads"
+		abort_script
 	fi
+
+	$BASEDIR/magiskboot compress=xz magisk magisk.xz
+	$BASEDIR/magiskboot compress=xz init-ld init-ld.xz
+	for file in busybox magiskboot magiskpolicy; do
+		[ -f "$file" ] && $BASEDIR/magiskboot compress=xz "$file" "$file.xz"
+	done
+	for file in util_functions.sh module_installer.sh; do
+		[ -f "assets/$file" ] && cp "assets/$file" "$file" && $BASEDIR/magiskboot compress=xz "$file" "$file.xz"
+	done
 
 	if $STUBAPK; then
 		echo "[!] stub.apk is present, compress and add it to ramdisk"
@@ -1751,15 +1737,17 @@ patching_ramdisk(){
 	echo "[!] patching the ramdisk with Magisk Init"
 	$BASEDIR/magiskboot cpio ramdisk.cpio \
 	"add 0750 init magiskinit" \
-	"$SKIPMAGISK add 0644 overlay.d/sbin/magisk.xz magisk.xz" \
-	"$SKIP32 add 0644 overlay.d/sbin/magisk32.xz magisk32.xz" \
-	"$SKIP64 add 0644 overlay.d/sbin/magisk64.xz magisk64.xz" \
+	"add 0644 overlay.d/sbin/magisk.xz magisk.xz" \
 	"$SKIPSTUB add 0644 overlay.d/sbin/stub.xz stub.xz" \
-	"$SKIPINITLD add 0644 overlay.d/sbin/init-ld.xz init-ld.xz" \
+	"add 0644 overlay.d/sbin/init-ld.xz init-ld.xz" \
 	"patch" \
 	"backup ramdisk.cpio.orig" \
 	"mkdir 000 .backup" \
 	"add 000 .backup/.magisk config"
+
+	for file in busybox magiskboot magiskpolicy util_functions.sh module_installer.sh; do
+		[ -f "$file.xz" ] && $BASEDIR/magiskboot cpio ramdisk.cpio "add 0644 overlay.d/sbin/$file.xz $file.xz"
+	done
 }
 
 
@@ -2288,31 +2276,6 @@ echo -n >/dev/.magisk_unblock
 }
 
 
-API=\$(getprop ro.build.version.sdk)
-  ABI=\$(getprop ro.product.cpu.abi)
-  if [ \"\$ABI\" = \"x86\" ]; then
-    ARCH=x86
-    ABI32=x86
-    IS64BIT=false
-  elif [ \"\$ABI\" = \"arm64-v8a\" ]; then
-    ARCH=arm64
-    ABI32=armeabi-v7a
-    IS64BIT=true
-  elif [ \"\$ABI\" = \"x86_64\" ]; then
-    ARCH=x64
-    ABI32=x86
-    IS64BIT=true
-  else
-    ARCH=arm
-    ABI=armeabi-v7a
-    ABI32=armeabi-v7a
-    IS64BIT=false
-  fi
-
-magisk_name=\"magisk32\"
-[ \"\$IS64BIT\" == true ] && magisk_name=\"magisk64\"
-[ -f ./magisk ] && magisk_name=\"magisk\"
-
 # umount previous /sbin tmpfs overlay
 
 count=0
@@ -2340,9 +2303,12 @@ mkdir -p \$MAGISKTMP/emu
 exec 2>>\$MAGISKTMP/emu/record_logs.txt
 exec >>\$MAGISKTMP/emu/record_logs.txt
 
-cd $MAGISKBASE
+for base in /debug_ramdisk /sbin /magisk $MAGISKBASE; do
+  [ -f \"\$base/magisk\" ] && MAGISKBASE=\"\$base\" && break
+done
+cd \"\$MAGISKBASE\" || { echo -n >/dev/.overlay_unblock; exit_magisk; exit 0; }
 
-test ! -f \"./\$magisk_name\" && { echo -n >/dev/.overlay_unblock; exit_magisk; exit 0; }
+test ! -f ./magisk && { echo -n >/dev/.overlay_unblock; exit_magisk; exit 0; }
 
 
 MAGISKBIN=/data/adb/magisk
@@ -2351,22 +2317,17 @@ for mdir in modules post-fs-data.d service.d magisk; do
 test ! -d /data/adb/\$mdir && rm -rf /data/adb/\$mdir
 mkdir /data/adb/\$mdir 2>/dev/null
 done
-for file in magisk magisk32 magisk64 magiskinit; do
+for file in magisk magiskinit init-ld magiskboot magiskpolicy busybox util_functions.sh module_installer.sh; do
   cp -af ./\$file \$MAGISKTMP/\$file 2>/dev/null
   chmod 755 \$MAGISKTMP/\$file
   cp -af ./\$file \$MAGISKBIN/\$file 2>/dev/null
   chmod 755 \$MAGISKBIN/\$file
 done
-cp -af ./magiskboot \$MAGISKBIN/magiskboot
-cp -af ./busybox \$MAGISKBIN/busybox
-cp -af ./busybox \$MAGISKTMP
 chmod 755 \$MAGISKTMP/busybox
 \$MAGISKTMP/busybox --install -s \$MAGISKTMP
-cp -af ./assets/* \$MAGISKBIN
 
 # create symlink / applet
 
-ln -s ./\$magisk_name \$MAGISKTMP/magisk 2>/dev/null
 ln -s ./magisk \$MAGISKTMP/su 2>/dev/null
 ln -s ./magisk \$MAGISKTMP/resetprop 2>/dev/null
 ln -s ./magisk \$MAGISKTMP/magiskhide 2>/dev/null
@@ -2504,12 +2465,7 @@ SettingBlueStackMagiskPermissions() {
 		set_perm_recursive assets $ROOT $ROOT 0750 0777
 		set_perm ./busybox $ROOT $ROOT 0750 u:object_r:magisk_file:s0
 
-		if [ -e "magisk64" ]; then
-			set_perm ./magisk64 $ROOT $ROOT 0750 u:object_r:magisk_exec:s0
-		elif [ -e "magisk32" ]; then
-			set_perm ./magisk32 $ROOT $ROOT 0750 u:object_r:magisk_exec:s0
-		fi
-
+		set_perm ./magisk $ROOT $ROOT 0750 u:object_r:magisk_exec:s0
 		set_perm ./magiskboot $ROOT $ROOT 0750
 		set_perm ./magiskinit $ROOT $ROOT 0750
 		set_perm ./overlay.sh $ROOT $ROOT 0750
@@ -2529,8 +2485,7 @@ InstallMagiskIntoBlueStacksRamdisk() {
 	echo "[-] copying Magisk Assets and Files"
 	cp -Rf $BASEDIR/assets $BLSTKMAGISKDIR/
 	cp $BB $BLSTKMAGISKDIR/
-	cp $BASEDIR/magisk32 $BLSTKMAGISKDIR/
-	cp $BASEDIR/magisk64 $BLSTKMAGISKDIR/
+	cp $BASEDIR/magisk $BLSTKMAGISKDIR/
 	cp $BASEDIR/magiskboot $BLSTKMAGISKDIR/
 	cp $BASEDIR/magiskinit $BLSTKMAGISKDIR/
 	cp $INITRC $BLSTKMAGISKDIR/
