@@ -1232,7 +1232,7 @@ FindWorkingBusyBox() {
 	for file in $(ls $BASEDIR/lib/*/*busybox*); do
 		chmod +x "$file"
 		bbversion=$($file | $file head -n 1)>/dev/null 2>&1
-		if [[ $bbversion == *"BusyBox"*"Magisk"*"multi-call"* ]]; then
+		if [[ $bbversion == *"BusyBox"*"multi-call"* ]]; then
 			TestingBusyBoxVersion "$file"
 			RESULT="$?"
 			if [[ "$RESULT" == "0" ]]; then

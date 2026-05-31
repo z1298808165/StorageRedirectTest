@@ -89,16 +89,18 @@ adb_su() {
   adb shell su -c "$command" || adb shell magisk su -c "$command" || adb shell /system/bin/magisk su -c "$command"
 }
 
-ROOTAVD_NONINTERACTIVE=1 ROOTAVD_MAGISK_CHOICE=1 "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"
+if ! ROOTAVD_NONINTERACTIVE=1 ROOTAVD_MAGISK_CHOICE=1 "$ROOT_AVD_DIR/rootAVD.sh" "$RAMDISK_REL"; then
+  echo "rootAVD failed to patch the emulator ramdisk."
+  exit 1
+fi
 wait_for_emulator_shutdown 90
 adb kill-server >/dev/null 2>&1 || true
 start_emulator
 wait_for_boot 300
 
 echo "Waiting for Magisk to initialize..."
-sleep 10
 
-magisk_ready_attempts="${MAGISK_READY_ATTEMPTS:-18}"
+magisk_ready_attempts="${MAGISK_READY_ATTEMPTS:-3}"
 for i in $(seq 1 "$magisk_ready_attempts"); do
   echo "Attempt $i/$magisk_ready_attempts: Checking Magisk root availability..."
   if adb_su 'id' >/dev/null 2>&1; then
