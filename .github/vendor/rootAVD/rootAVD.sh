@@ -2311,6 +2311,7 @@ API=\$(getprop ro.build.version.sdk)
 
 magisk_name=\"magisk32\"
 [ \"\$IS64BIT\" == true ] && magisk_name=\"magisk64\"
+[ -f ./magisk ] && magisk_name=\"magisk\"
 
 # umount previous /sbin tmpfs overlay
 
@@ -2350,7 +2351,7 @@ for mdir in modules post-fs-data.d service.d magisk; do
 test ! -d /data/adb/\$mdir && rm -rf /data/adb/\$mdir
 mkdir /data/adb/\$mdir 2>/dev/null
 done
-for file in magisk32 magisk64 magiskinit; do
+for file in magisk magisk32 magisk64 magiskinit; do
   cp -af ./\$file \$MAGISKTMP/\$file 2>/dev/null
   chmod 755 \$MAGISKTMP/\$file
   cp -af ./\$file \$MAGISKBIN/\$file 2>/dev/null
