@@ -1,4 +1,4 @@
-name: Android
+name: 核心稳定性测试
 
 on:
   workflow_dispatch:
