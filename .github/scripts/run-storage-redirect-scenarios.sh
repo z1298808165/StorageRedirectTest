@@ -135,8 +135,10 @@ run_service_case() {
       if [ -z "$pass_pattern" ]; then
         return 0
       fi
-      grep -q "$pass_pattern" "$output_file"
-      return 0
+      if grep -q "$pass_pattern" "$output_file"; then
+        return 0
+      fi
+      return 1
     fi
     sleep 1
   done
