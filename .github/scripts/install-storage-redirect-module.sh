@@ -91,7 +91,9 @@ start_emulator() {
 
 adb_root() {
   local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:\$PATH; $1"
-  adb shell su 0 sh -c "$command" || adb shell su -c "$command"
+  local quoted
+  quoted="$(printf '%s' "$command" | sed "s/'/'\\\\''/g")"
+  adb shell "su 0 sh -c '$quoted'" || adb shell "su -c '$quoted'"
 }
 
 adb_su() {

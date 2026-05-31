@@ -13,7 +13,9 @@ PAYLOAD="storage-redirect-test:file:ci"
 
 adb_root() {
   local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:\$PATH; $1"
-  adb shell su 0 sh -c "$command" || adb shell su -c "$command"
+  local quoted
+  quoted="$(printf '%s' "$command" | sed "s/'/'\\\\''/g")"
+  adb shell "su 0 sh -c '$quoted'" || adb shell "su -c '$quoted'"
 }
 
 adb_su() {
@@ -29,7 +31,7 @@ wait_boot_completed() {
 write_config() {
   local content="$1"
   adb_su "mkdir -p /data/adb/modules/storage.redirect.x/config/apps" >/dev/null
-  printf '%s' "$content" | adb shell su 0 sh -c "cat > '$CONFIG'" >/dev/null
+  printf '%s' "$content" | adb_root "cat > '$CONFIG'" >/dev/null
 }
 
 apply_config() {
