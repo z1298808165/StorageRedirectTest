@@ -63,8 +63,7 @@ expected_prefix() {
   case "$1" in
     1|5) echo "${REAL_ROOT}/Download/SrtProbe/" ;;
     2) echo "${PRIVATE_ROOT}/Download/SrtProbe/" ;;
-    3) echo "${PRIVATE_ROOT}/Download/Test/" ;;
-    4) echo "${REAL_ROOT}/Download/Test/" ;;
+    3|4) echo "${REAL_ROOT}/Download/Test/" ;;
   esac
 }
 
@@ -72,7 +71,7 @@ scenario_title() {
   case "$1" in
     1) echo "未启用应用配置，验证默认真实路径写入" ;;
     2) echo "启用重定向，验证写入应用私有空间" ;;
-    3) echo "启用路径映射，验证 SrtProbe 映射到 Test" ;;
+    3) echo "启用路径映射，验证 SrtProbe 写入真实 Test" ;;
     4) echo "路径映射叠加真实路径放行，验证映射优先级" ;;
     5) echo "放行真实 Download，验证保持原路径写入" ;;
   esac
