@@ -20,15 +20,12 @@ class StorageRedirectTestRunner(private val context: Context) {
 
     /**
      * ALL 模式：不依赖外部 URI/路径，先 create 再将其作为参数传给 read/write。
+     * MediaStore query 用例保留为独立用例，由设备侧脚本逐项触发，避免全量查询干扰长链路聚合。
      */
     private fun runAllExceptDelete(overrides: TestCaseArgs): List<TestResult> {
         val results = mutableListOf<TestResult>()
         val mediaStore = MediaStoreTestCases(context)
         val fileCases = FileTestCases(context)
-
-        TestCase.executableCases
-            .filter { it.id.startsWith("mediastore_query") }
-            .forEach { results += runLogged(it, overrides) }
 
         val mediaTypes = listOf(
             IMediaStoreApi.MediaType.IMAGE to listOf(
@@ -119,6 +116,22 @@ class StorageRedirectTestRunner(private val context: Context) {
                 payload = TestFixtures.filePayload("all-updated"),
                 expectedPayload = TestFixtures.filePayload("all-updated"),
             ),
+        )
+        results += runLogged(
+            TestCase.FILE_STAT,
+            TestCaseArgs(filePath = filePath),
+        )
+        results += runLogged(
+            TestCase.FILE_ACCESS,
+            TestCaseArgs(filePath = filePath),
+        )
+        results += runLogged(
+            TestCase.FILE_TRUNCATE,
+            TestCaseArgs(filePath = filePath, length = 4),
+        )
+        results += runLogged(
+            TestCase.FILE_FTRUNCATE,
+            TestCaseArgs(filePath = filePath, length = 8),
         )
 
         return results

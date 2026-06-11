@@ -16,6 +16,10 @@ TEST_FILE="srt_ci_probe.txt"
 READ_ONLY_FILE="srt_read_only_seed.txt"
 ALLOW_KEEP_FILE="keep.txt"
 ALLOW_PART_FILE="srt_ci_probe.part"
+QMARK_SINGLE_FILE="srt_qmark_a.txt"
+QMARK_DOUBLE_FILE="srt_qmark_ab.txt"
+READ_ONLY_HARDLINK="hardlink.txt"
+READ_ONLY_SYMLINK="symlink.txt"
 PAYLOAD="storage-redirect-test:file:ci"
 READ_ONLY_PAYLOAD="storage-redirect-test:file:readonly"
 
@@ -24,6 +28,10 @@ MAPPED_READ_ONLY_REQUEST="${REAL_ROOT}/Download/SrtMapRO"
 MAPPED_READ_ONLY_TARGET="${REAL_ROOT}/Pictures/SrtLocked"
 ALLOW_ROOT="${REAL_ROOT}/Download/SrtAllow"
 PRIVATE_ALLOW_ROOT="${PRIVATE_ROOT}/Download/SrtAllow"
+LEGACY_ROOT="${REAL_ROOT}/Download/SrtLegacy"
+PRIVATE_LEGACY_ROOT="${PRIVATE_ROOT}/Download/SrtLegacy"
+QMARK_ROOT="${REAL_ROOT}/Download/SrtQMark"
+PRIVATE_QMARK_ROOT="${PRIVATE_ROOT}/Download/SrtQMark"
 
 adb_root() {
   local command="PATH=/debug_ramdisk:/sbin:/data/adb/magisk:\$PATH; $1"
@@ -81,7 +89,19 @@ apply_config() {
       write_config '{"users":{"0":{"enabled":true,"path_mappings":{"Download/SrtMapRO":"Pictures/SrtLocked"},"read_only_paths":["Pictures/SrtLocked"]}}}'
       ;;
     11)
-      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtAllow","!Download/SrtAllow/tmp","!Download/SrtAllow/*.part"]}}}'
+      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtAllow","!Download/SrtAllow/tmp","Download","!Download/*.part"]}}}'
+      ;;
+    12)
+      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtLegacy"],"excluded_real_paths":["Download/SrtLegacy/tmp"]}}}'
+      ;;
+    13)
+      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/srt_qmark_?.txt"]}}}'
+      ;;
+    14)
+      write_config '{"users":{"0":{"enabled":true,"path_mappings":{"Download/SrtLongest":"Download/SrtLongestBase","Download/SrtLongest/Deep":"Download/SrtLongestDeep"}}}}'
+      ;;
+    15)
+      write_config '{"users":{"0":{"enabled":true,"mapping_mode_only":true,"sandboxed_paths":"Download/SrtPriority","path_mappings":{"Download/SrtPriority":"Download/SrtPriorityMapped"}}}}'
       ;;
     *)
       echo "unknown scenario: $1" >&2
@@ -93,6 +113,8 @@ apply_config() {
 target_path() {
   case "$1" in
     8) echo "${REAL_ROOT}/.xldownload/${TEST_FILE}" ;;
+    14) echo "${REAL_ROOT}/Download/SrtLongest/Deep/${TEST_FILE}" ;;
+    15) echo "${REAL_ROOT}/Download/SrtPriority/${TEST_FILE}" ;;
     *) echo "${REAL_ROOT}/Download/SrtProbe/${TEST_FILE}" ;;
   esac
 }
@@ -100,6 +122,8 @@ target_path() {
 logical_dir() {
   case "$1" in
     8) echo "${REAL_ROOT}/.xldownload" ;;
+    14) echo "${REAL_ROOT}/Download/SrtLongest/Deep" ;;
+    15) echo "${REAL_ROOT}/Download/SrtPriority" ;;
     *) echo "${REAL_ROOT}/Download/SrtProbe" ;;
   esac
 }
@@ -111,6 +135,8 @@ expected_path() {
     3|4) echo "${REAL_ROOT}/Download/Test/${TEST_FILE}" ;;
     7) echo "${REAL_ROOT}/Download/SrtMapOnlyMapped/${TEST_FILE}" ;;
     8) echo "${PRIVATE_ROOT}/.xldownload/${TEST_FILE}" ;;
+    14) echo "${REAL_ROOT}/Download/SrtLongestDeep/${TEST_FILE}" ;;
+    15) echo "${REAL_ROOT}/Download/SrtPriorityMapped/${TEST_FILE}" ;;
     *) return 1 ;;
   esac
 }
@@ -128,13 +154,19 @@ scenario_title() {
     9) echo "read_only_paths 允许读取但拒绝写入、删除、mkdir、rename" ;;
     10) echo "映射目标为只读路径时，映射请求写入应被拒绝" ;;
     11) echo "allowed_real_paths 内联排除与通配符排除规则" ;;
+    12) echo "excluded_real_paths 旧字段兼容并入排除规则" ;;
+    13) echo "allowed_real_paths 问号通配符规则" ;;
+    14) echo "path_mappings 最长前缀匹配规则" ;;
+    15) echo "映射优先于字符串形式 sandboxed_paths" ;;
   esac
 }
 
 clean_targets() {
   clean_results
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/SrtOther' '${REAL_ROOT}/Download/SrtOtherMapped' '${REAL_ROOT}/Download/SrtMapOnlyMapped' '${REAL_ROOT}/Download/SrtReadOnly' '${REAL_ROOT}/Download/SrtMapRO' '${REAL_ROOT}/Download/SrtAllow' '${REAL_ROOT}/Pictures/SrtLocked' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/SrtOther' '${PRIVATE_ROOT}/Download/SrtOtherMapped' '${PRIVATE_ROOT}/Download/SrtMapOnlyMapped' '${PRIVATE_ROOT}/Download/SrtReadOnly' '${PRIVATE_ROOT}/Download/SrtMapRO' '${PRIVATE_ROOT}/Download/SrtAllow' '${PRIVATE_ROOT}/Pictures/SrtLocked'; find '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/Test' '${REAL_ROOT}/.xldownload' '${REAL_ROOT}/.xlDownload' '${PRIVATE_ROOT}/.xldownload' '${PRIVATE_ROOT}/.xlDownload' -maxdepth 1 -name '$TEST_FILE' -delete 2>/dev/null || true" >/dev/null
+  adb_su "rm -f '${REAL_ROOT}/Download/$ALLOW_PART_FILE' '${PRIVATE_ROOT}/Download/$ALLOW_PART_FILE' '${REAL_ROOT}/Download/$QMARK_SINGLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_SINGLE_FILE' '${REAL_ROOT}/Download/$QMARK_DOUBLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_DOUBLE_FILE'" >/dev/null
   adb_su "mkdir -p '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${REAL_ROOT}/Download/SrtMapOnlyMapped' '${REAL_ROOT}/Download/SrtReadOnly' '${REAL_ROOT}/Download/SrtMapRO' '${REAL_ROOT}/Download/SrtAllow/tmp' '${REAL_ROOT}/Pictures/SrtLocked' '${REAL_ROOT}/.xldownload' '${REAL_ROOT}/.xlDownload' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtMapOnlyMapped' '${PRIVATE_ROOT}/Download/SrtReadOnly' '${PRIVATE_ROOT}/Download/SrtMapRO' '${PRIVATE_ROOT}/Download/SrtAllow/tmp' '${PRIVATE_ROOT}/Pictures/SrtLocked' '${PRIVATE_ROOT}/.xldownload' '${PRIVATE_ROOT}/.xlDownload'; chmod -R 777 '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${REAL_ROOT}/Download/SrtMapOnlyMapped' '${REAL_ROOT}/Download/SrtReadOnly' '${REAL_ROOT}/Download/SrtMapRO' '${REAL_ROOT}/Download/SrtAllow' '${REAL_ROOT}/Pictures/SrtLocked' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtMapOnlyMapped' '${PRIVATE_ROOT}/Download/SrtReadOnly' '${PRIVATE_ROOT}/Download/SrtMapRO' '${PRIVATE_ROOT}/Download/SrtAllow' '${PRIVATE_ROOT}/Pictures/SrtLocked' 2>/dev/null || true; chmod 777 '${REAL_ROOT}/.xldownload' '${REAL_ROOT}/.xlDownload' '${PRIVATE_ROOT}/.xldownload' '${PRIVATE_ROOT}/.xlDownload' 2>/dev/null || true" >/dev/null
+  adb_su "rm -rf '${REAL_ROOT}/Download/SrtLegacy' '${REAL_ROOT}/Download/SrtQMark' '${REAL_ROOT}/Download/SrtLongest' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy' '${PRIVATE_ROOT}/Download/SrtQMark' '${PRIVATE_ROOT}/Download/SrtLongest' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped'; mkdir -p '${REAL_ROOT}/Download/SrtLegacy/tmp' '${REAL_ROOT}/Download/SrtQMark/Keep1' '${REAL_ROOT}/Download/SrtQMark/Keep12' '${REAL_ROOT}/Download/SrtLongest/Deep' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy/tmp' '${PRIVATE_ROOT}/Download/SrtQMark/Keep1' '${PRIVATE_ROOT}/Download/SrtQMark/Keep12' '${PRIVATE_ROOT}/Download/SrtLongest/Deep' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped'; chmod -R 777 '${REAL_ROOT}/Download/SrtLegacy' '${REAL_ROOT}/Download/SrtQMark' '${REAL_ROOT}/Download/SrtLongest' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy' '${PRIVATE_ROOT}/Download/SrtQMark' '${PRIVATE_ROOT}/Download/SrtLongest' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped' 2>/dev/null || true" >/dev/null
 }
 
 clean_results() {
@@ -225,6 +257,13 @@ run_create_case() {
   local label="$2"
   local path="$3"
   run_service_case "$scenario" "$label" "file_create" '^PASS \[file_create\]' --es file_path "$path"
+}
+
+run_mediastore_download_create_case() {
+  local scenario="$1"
+  local label="$2"
+  local file_name="$3"
+  run_service_case "$scenario" "$label" "mediastore_create_download" '^PASS \[mediastore_create_download\]' --es file_name "$file_name"
 }
 
 run_write_test() {
@@ -334,12 +373,14 @@ check_file_location() {
 }
 
 seed_read_only_targets() {
-  adb_su "mkdir -p '$READ_ONLY_ROOT'; rm -f '$READ_ONLY_ROOT/write_denied.txt' '$READ_ONLY_ROOT/renamed.txt'; rm -rf '$READ_ONLY_ROOT/newdir'; printf '%s' '$READ_ONLY_PAYLOAD' > '$READ_ONLY_ROOT/$READ_ONLY_FILE'; chmod -R 777 '$READ_ONLY_ROOT' 2>/dev/null || true" >/dev/null
+  adb_su "mkdir -p '$READ_ONLY_ROOT'; rm -f '$READ_ONLY_ROOT/write_denied.txt' '$READ_ONLY_ROOT/renamed.txt' '$READ_ONLY_ROOT/$READ_ONLY_HARDLINK' '$READ_ONLY_ROOT/$READ_ONLY_SYMLINK'; rm -rf '$READ_ONLY_ROOT/newdir'; printf '%s' '$READ_ONLY_PAYLOAD' > '$READ_ONLY_ROOT/$READ_ONLY_FILE'; chmod -R 777 '$READ_ONLY_ROOT' 2>/dev/null || true" >/dev/null
 }
 
 check_read_only_artifacts() {
   check_file_exists "read-only-seed" "$READ_ONLY_ROOT/$READ_ONLY_FILE" &&
     check_file_missing "read-only-write" "$READ_ONLY_ROOT/write_denied.txt" &&
+    check_file_missing "read-only-hardlink" "$READ_ONLY_ROOT/$READ_ONLY_HARDLINK" &&
+    check_file_missing "read-only-symlink" "$READ_ONLY_ROOT/$READ_ONLY_SYMLINK" &&
     check_file_missing "read-only-mkdir" "$READ_ONLY_ROOT/newdir" &&
     check_file_missing "read-only-rename-target" "$READ_ONLY_ROOT/renamed.txt"
 }
@@ -348,7 +389,15 @@ run_read_only_scenario() {
   local scenario="$1"
   seed_read_only_targets
   run_service_case "$scenario" "read-only-read" "file_read" '^PASS \[file_read\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" --es expected_payload "$READ_ONLY_PAYLOAD" &&
+    run_service_case "$scenario" "read-only-stat" "file_stat" '^PASS \[file_stat\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" &&
+    run_service_case "$scenario" "read-only-access" "file_access" '^PASS \[file_access\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" &&
     run_service_case "$scenario" "read-only-write-denied" "file_write_denied" '^PASS \[file_write_denied\]' --es file_path "$READ_ONLY_ROOT/write_denied.txt" --es payload "$PAYLOAD" &&
+    run_service_case "$scenario" "read-only-truncate-denied" "file_truncate_denied" '^PASS \[file_truncate_denied\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" --es length "4" &&
+    run_service_case "$scenario" "read-only-ftruncate-denied" "file_ftruncate_denied" '^PASS \[file_ftruncate_denied\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" --es length "8" &&
+    run_service_case "$scenario" "read-only-chmod-denied" "file_chmod_denied" '^PASS \[file_chmod_denied\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" --es mode "0600" &&
+    run_service_case "$scenario" "read-only-fchmod-denied" "file_fchmod_denied" '^PASS \[file_fchmod_denied\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" --es mode "0600" &&
+    run_service_case "$scenario" "read-only-link-denied" "file_link_denied" '^PASS \[file_link_denied\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" --es target_file_path "$READ_ONLY_ROOT/$READ_ONLY_HARDLINK" &&
+    run_service_case "$scenario" "read-only-symlink-denied" "file_symlink_denied" '^PASS \[file_symlink_denied\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" --es target_file_path "$READ_ONLY_ROOT/$READ_ONLY_SYMLINK" &&
     run_service_case "$scenario" "read-only-mkdir-denied" "file_mkdir_denied" '^PASS \[file_mkdir_denied\]' --es file_dir "$READ_ONLY_ROOT/newdir" &&
     run_service_case "$scenario" "read-only-rename-denied" "file_rename_denied" '^PASS \[file_rename_denied\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" --es target_file_path "$READ_ONLY_ROOT/renamed.txt" &&
     run_service_case "$scenario" "read-only-delete-denied" "file_delete_denied" '^PASS \[file_delete_denied\]' --es file_path "$READ_ONLY_ROOT/$READ_ONLY_FILE" &&
@@ -373,8 +422,8 @@ run_allow_exclusion_scenario() {
   local keep_private="$PRIVATE_ALLOW_ROOT/$ALLOW_KEEP_FILE"
   local tmp_path="$ALLOW_ROOT/tmp/$TEST_FILE"
   local tmp_private="$PRIVATE_ALLOW_ROOT/tmp/$TEST_FILE"
-  local part_path="$ALLOW_ROOT/$ALLOW_PART_FILE"
-  local part_private="$PRIVATE_ALLOW_ROOT/$ALLOW_PART_FILE"
+  local part_path="$REAL_ROOT/Download/$ALLOW_PART_FILE"
+  local part_private="$PRIVATE_ROOT/Download/$ALLOW_PART_FILE"
 
   run_write_case "$scenario" "allow-real-write" "$keep_path" "$PAYLOAD" &&
     check_file_exists "allow-real" "$keep_path" &&
@@ -382,9 +431,39 @@ run_allow_exclusion_scenario() {
     run_write_case "$scenario" "allow-excluded-dir-write" "$tmp_path" "$PAYLOAD" &&
     check_file_exists "allow-excluded-dir-private" "$tmp_private" &&
     check_file_missing "allow-excluded-dir-real" "$tmp_path" &&
-    run_create_case "$scenario" "allow-excluded-glob-create" "$part_path" &&
+    run_mediastore_download_create_case "$scenario" "allow-excluded-glob-download-create" "$ALLOW_PART_FILE" &&
     check_file_exists "allow-excluded-glob-private" "$part_private" &&
     check_file_missing "allow-excluded-glob-real" "$part_path"
+}
+
+run_legacy_exclusion_scenario() {
+  local scenario="$1"
+  local keep_path="$LEGACY_ROOT/$ALLOW_KEEP_FILE"
+  local keep_private="$PRIVATE_LEGACY_ROOT/$ALLOW_KEEP_FILE"
+  local tmp_path="$LEGACY_ROOT/tmp/$TEST_FILE"
+  local tmp_private="$PRIVATE_LEGACY_ROOT/tmp/$TEST_FILE"
+
+  run_write_case "$scenario" "legacy-allow-real-write" "$keep_path" "$PAYLOAD" &&
+    check_file_exists "legacy-allow-real" "$keep_path" &&
+    check_file_missing "legacy-allow-private" "$keep_private" &&
+    run_write_case "$scenario" "legacy-excluded-write" "$tmp_path" "$PAYLOAD" &&
+    check_file_exists "legacy-excluded-private" "$tmp_private" &&
+    check_file_missing "legacy-excluded-real" "$tmp_path"
+}
+
+run_qmark_wildcard_scenario() {
+  local scenario="$1"
+  local single_path="$REAL_ROOT/Download/$QMARK_SINGLE_FILE"
+  local single_private="$PRIVATE_ROOT/Download/$QMARK_SINGLE_FILE"
+  local double_path="$REAL_ROOT/Download/$QMARK_DOUBLE_FILE"
+  local double_private="$PRIVATE_ROOT/Download/$QMARK_DOUBLE_FILE"
+
+  run_mediastore_download_create_case "$scenario" "qmark-single-char-download-create" "$QMARK_SINGLE_FILE" &&
+    check_file_exists "qmark-single-char-real" "$single_path" &&
+    check_file_missing "qmark-single-char-private" "$single_private" &&
+    run_mediastore_download_create_case "$scenario" "qmark-two-char-download-create" "$QMARK_DOUBLE_FILE" &&
+    check_file_exists "qmark-two-char-private" "$double_private" &&
+    check_file_missing "qmark-two-char-real" "$double_path"
 }
 
 check_health() {
@@ -444,6 +523,14 @@ run_scenario() {
       echo "step 5/7: 执行放行、排除目录写入和通配符排除创建"
       run_allow_exclusion_scenario "$scenario"
       ;;
+    12)
+      echo "step 5/7: 执行旧 excluded_real_paths 字段兼容验证"
+      run_legacy_exclusion_scenario "$scenario"
+      ;;
+    13)
+      echo "step 5/7: 执行问号通配符放行验证"
+      run_qmark_wildcard_scenario "$scenario"
+      ;;
     *)
       run_standard_scenario "$scenario"
       ;;
@@ -460,12 +547,12 @@ wait_storage_ready "initial"
 adb_su ": > '$LOG_PATH' 2>/dev/null || true" >/dev/null
 
 fail=0
-export APP_ID CONFIG LOG_PATH ACTION RESULT_DIR INTERNAL_RESULT_DIR REAL_ROOT BACKEND_ROOT PRIVATE_ROOT BACKEND_PRIVATE_ROOT SANDBOX_RESULT_DIR TEST_FILE READ_ONLY_FILE ALLOW_KEEP_FILE ALLOW_PART_FILE PAYLOAD READ_ONLY_PAYLOAD READ_ONLY_ROOT MAPPED_READ_ONLY_REQUEST MAPPED_READ_ONLY_TARGET ALLOW_ROOT PRIVATE_ALLOW_ROOT
-export -f adb_root adb_su wait_boot_completed write_config apply_config target_path logical_dir expected_path scenario_title clean_targets clean_results latest_result prepare_service_case wait_storage_ready print_storage_state run_service_case run_write_case run_write_test check_app_view expect_app_entry expect_no_app_entry find_written_file check_file_exists check_file_missing check_file_location seed_read_only_targets check_read_only_artifacts run_read_only_scenario prepare_mapped_read_only_targets run_mapped_read_only_scenario run_allow_exclusion_scenario check_health print_diagnostics run_standard_scenario run_scenario
+export APP_ID CONFIG LOG_PATH ACTION RESULT_DIR INTERNAL_RESULT_DIR REAL_ROOT BACKEND_ROOT PRIVATE_ROOT BACKEND_PRIVATE_ROOT SANDBOX_RESULT_DIR TEST_FILE READ_ONLY_FILE ALLOW_KEEP_FILE ALLOW_PART_FILE QMARK_SINGLE_FILE QMARK_DOUBLE_FILE READ_ONLY_HARDLINK READ_ONLY_SYMLINK PAYLOAD READ_ONLY_PAYLOAD READ_ONLY_ROOT MAPPED_READ_ONLY_REQUEST MAPPED_READ_ONLY_TARGET ALLOW_ROOT PRIVATE_ALLOW_ROOT LEGACY_ROOT PRIVATE_LEGACY_ROOT QMARK_ROOT PRIVATE_QMARK_ROOT
+export -f adb_root adb_su wait_boot_completed write_config apply_config target_path logical_dir expected_path scenario_title clean_targets clean_results latest_result prepare_service_case wait_storage_ready print_storage_state run_service_case run_write_case run_create_case run_mediastore_download_create_case run_write_test check_app_view expect_app_entry expect_no_app_entry find_written_file check_file_exists check_file_missing check_file_location seed_read_only_targets check_read_only_artifacts run_read_only_scenario prepare_mapped_read_only_targets run_mapped_read_only_scenario run_allow_exclusion_scenario run_legacy_exclusion_scenario run_qmark_wildcard_scenario check_health print_diagnostics run_standard_scenario run_scenario
 
-for scenario in 1 2 3 4 5 6 7 8 9 10 11; do
+for scenario in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
   echo "::group::scenario ${scenario}: $(scenario_title "$scenario")"
-  if ! timeout --foreground 360s bash -c 'run_scenario "$1"' _ "$scenario"; then
+  if ! timeout --foreground 600s bash -c 'run_scenario "$1"' _ "$scenario"; then
     echo "scenario ${scenario}: failed or timed out"
     timeout --foreground 90s bash -c 'print_diagnostics "$1"' _ "$scenario" || true
     fail=1

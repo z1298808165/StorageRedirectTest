@@ -2,6 +2,7 @@ package me.fakerqu.test.storageredirect.test
 
 import android.content.Context
 import android.net.Uri
+import android.provider.MediaStore
 import android.util.Size
 import me.fakerqu.media_store_api.IMediaStoreApi
 import me.fakerqu.media_store_api.MediaStoreApiImpl
@@ -25,6 +26,21 @@ class MediaStoreTestCases(context: Context) {
 
     fun queryDownload(): TestResult =
         query(TestCase.MEDIASTORE_QUERY_DOWNLOAD, IMediaStoreApi.MediaType.DOWNLOAD)
+
+    fun queryImagePath(args: TestCaseArgs): TestResult =
+        queryPath(TestCase.MEDIASTORE_QUERY_PATH_IMAGE, IMediaStoreApi.MediaType.IMAGE, args)
+
+    fun queryVideoPath(args: TestCaseArgs): TestResult =
+        queryPath(TestCase.MEDIASTORE_QUERY_PATH_VIDEO, IMediaStoreApi.MediaType.VIDEO, args)
+
+    fun queryAudioPath(args: TestCaseArgs): TestResult =
+        queryPath(TestCase.MEDIASTORE_QUERY_PATH_AUDIO, IMediaStoreApi.MediaType.AUDIO, args)
+
+    fun queryFilePath(args: TestCaseArgs): TestResult =
+        queryPath(TestCase.MEDIASTORE_QUERY_PATH_FILE, IMediaStoreApi.MediaType.FILE, args)
+
+    fun queryDownloadPath(args: TestCaseArgs): TestResult =
+        queryPath(TestCase.MEDIASTORE_QUERY_PATH_DOWNLOAD, IMediaStoreApi.MediaType.DOWNLOAD, args)
 
     fun createImage(args: TestCaseArgs): TestResult =
         create(TestCase.MEDIASTORE_CREATE_IMAGE, IMediaStoreApi.MediaType.IMAGE, args)
@@ -100,11 +116,60 @@ class MediaStoreTestCases(context: Context) {
                 metadata = mapOf(
                     "mediaType" to mediaType.name,
                     "rowCount" to rows.size.toString(),
-                    "paths" to rows.map { item -> item.joinToString { it.toString() } }
-                        .joinToString(separator = "\n") { it }
+                    "sampleRows" to rows.take(MAX_QUERY_SAMPLE_ROWS)
+                        .joinToString(separator = " | ") { row ->
+                            row.joinToString { item -> "${item.columnName}=${item.value}" }
+                        },
                 ),
             )
         }
+
+    private fun queryPath(
+        testCase: TestCase,
+        mediaType: IMediaStoreApi.MediaType,
+        args: TestCaseArgs,
+    ): TestResult = testCase.measure {
+        val expectedPath = args.expectedPath
+            ?: return@measure args.missingExpectedPathResult(testCase)
+        val fileName = args.fileName ?: expectedPath.substringAfterLast("/")
+        if (fileName.isBlank()) {
+            return@measure testCase.fail(
+                message = "missing required parameter: ${TestCaseArgs.EXTRA_FILE_NAME}",
+                metadata = mapOf("hint" to "pass file name via --es ${TestCaseArgs.EXTRA_FILE_NAME}"),
+            )
+        }
+        val rows = api.getMedia(mediaType, volume, TestFixtures.projection(mediaType))
+        val candidates = rows
+            .map { row -> row.associate { it.columnName to (it.value?.toString() ?: "") } }
+            .filter { row ->
+                row[MediaStore.MediaColumns.DISPLAY_NAME] == fileName ||
+                    row[MediaStore.MediaColumns.DATA]?.endsWith("/$fileName") == true
+            }
+        if (candidates.isEmpty()) {
+            return@measure testCase.fail(
+                message = "media row not found",
+                metadata = mapOf(
+                    "mediaType" to mediaType.name,
+                    "fileName" to fileName,
+                    "rowCount" to rows.size.toString(),
+                ),
+            )
+        }
+        val matched = candidates.firstOrNull { row ->
+            row[MediaStore.MediaColumns.DATA] == expectedPath
+        } ?: candidates.first()
+        val actualPath = matched[MediaStore.MediaColumns.DATA].orEmpty()
+        if (actualPath != expectedPath) {
+            return@measure testCase.fail(
+                message = "DATA path mismatch",
+                metadata = queryPathMetadata(mediaType, fileName, expectedPath, matched),
+            )
+        }
+        testCase.pass(
+            message = "query path matched expected DATA",
+            metadata = queryPathMetadata(mediaType, fileName, expectedPath, matched),
+        )
+    }
 
     private fun create(
         testCase: TestCase,
@@ -241,9 +306,37 @@ class MediaStoreTestCases(context: Context) {
 
     private fun uriMetadata(uri: Uri): Map<String, String> = mapOf("uri" to uri.toString())
 
+    private fun queryPathMetadata(
+        mediaType: IMediaStoreApi.MediaType,
+        fileName: String,
+        expectedPath: String,
+        row: Map<String, String>,
+    ): Map<String, String> {
+        val metadata = mutableMapOf(
+            "mediaType" to mediaType.name,
+            "fileName" to fileName,
+            "expectedPath" to expectedPath,
+            "actualPath" to row[MediaStore.MediaColumns.DATA].orEmpty(),
+            "relativePath" to row[MediaStore.MediaColumns.RELATIVE_PATH].orEmpty(),
+        )
+        bucketIdColumn(mediaType)?.let { column ->
+            metadata["bucketId"] = row[column].orEmpty()
+        }
+        return metadata
+    }
+
+    private fun bucketIdColumn(mediaType: IMediaStoreApi.MediaType): String? = when (mediaType) {
+        IMediaStoreApi.MediaType.IMAGE -> MediaStore.Images.ImageColumns.BUCKET_ID
+        IMediaStoreApi.MediaType.VIDEO -> MediaStore.Video.VideoColumns.BUCKET_ID
+        IMediaStoreApi.MediaType.AUDIO,
+        IMediaStoreApi.MediaType.FILE,
+        IMediaStoreApi.MediaType.DOWNLOAD -> null
+    }
+
     companion object {
         private const val IO_RETRY_COUNT = 8
         private const val IO_RETRY_DELAY_MS = 150L
+        private const val MAX_QUERY_SAMPLE_ROWS = 10
     }
 }
 
@@ -253,4 +346,10 @@ private fun TestCaseArgs.missingUriResult(testCase: TestCase): TestResult =
     testCase.fail(
         message = "missing required parameter: ${TestCaseArgs.EXTRA_MEDIA_URI}",
         metadata = mapOf("hint" to "pass content URI via broadcast --es ${TestCaseArgs.EXTRA_MEDIA_URI}"),
+    )
+
+private fun TestCaseArgs.missingExpectedPathResult(testCase: TestCase): TestResult =
+    testCase.fail(
+        message = "missing required parameter: ${TestCaseArgs.EXTRA_EXPECTED_PATH}",
+        metadata = mapOf("hint" to "pass expected DATA path via --es ${TestCaseArgs.EXTRA_EXPECTED_PATH}"),
     )

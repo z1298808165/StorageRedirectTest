@@ -14,6 +14,11 @@ enum class TestCase(val id: String) {
     MEDIASTORE_QUERY_AUDIO("mediastore_query_audio"),
     MEDIASTORE_QUERY_FILE("mediastore_query_file"),
     MEDIASTORE_QUERY_DOWNLOAD("mediastore_query_download"),
+    MEDIASTORE_QUERY_PATH_IMAGE("mediastore_query_path_image"),
+    MEDIASTORE_QUERY_PATH_VIDEO("mediastore_query_path_video"),
+    MEDIASTORE_QUERY_PATH_AUDIO("mediastore_query_path_audio"),
+    MEDIASTORE_QUERY_PATH_FILE("mediastore_query_path_file"),
+    MEDIASTORE_QUERY_PATH_DOWNLOAD("mediastore_query_path_download"),
 
     MEDIASTORE_CREATE_IMAGE("mediastore_create_image"),
     MEDIASTORE_CREATE_VIDEO("mediastore_create_video"),
@@ -52,26 +57,41 @@ enum class TestCase(val id: String) {
     FILE_MKDIR("file_mkdir"),
     FILE_MKDIR_DENIED("file_mkdir_denied"),
     FILE_RENAME("file_rename"),
-    FILE_RENAME_DENIED("file_rename_denied");
+    FILE_RENAME_DENIED("file_rename_denied"),
+    FILE_STAT("file_stat"),
+    FILE_ACCESS("file_access"),
+    FILE_READLINK("file_readlink"),
+    FILE_TRUNCATE("file_truncate"),
+    FILE_TRUNCATE_DENIED("file_truncate_denied"),
+    FILE_FTRUNCATE("file_ftruncate"),
+    FILE_FTRUNCATE_DENIED("file_ftruncate_denied"),
+    FILE_CHMOD("file_chmod"),
+    FILE_CHMOD_DENIED("file_chmod_denied"),
+    FILE_FCHMOD("file_fchmod"),
+    FILE_FCHMOD_DENIED("file_fchmod_denied"),
+    FILE_LINK("file_link"),
+    FILE_LINK_DENIED("file_link_denied"),
+    FILE_SYMLINK("file_symlink"),
+    FILE_SYMLINK_DENIED("file_symlink_denied");
 
     fun getMediaType(): IMediaStoreApi.MediaType? = when (this) {
-        MEDIASTORE_QUERY_IMAGE, MEDIASTORE_CREATE_IMAGE, MEDIASTORE_READ_IMAGE,
+        MEDIASTORE_QUERY_IMAGE, MEDIASTORE_QUERY_PATH_IMAGE, MEDIASTORE_CREATE_IMAGE, MEDIASTORE_READ_IMAGE,
         MEDIASTORE_WRITE_IMAGE, MEDIASTORE_DELETE_IMAGE, MEDIASTORE_THUMBNAIL_IMAGE ->
             IMediaStoreApi.MediaType.IMAGE
 
-        MEDIASTORE_QUERY_VIDEO, MEDIASTORE_CREATE_VIDEO, MEDIASTORE_READ_VIDEO,
+        MEDIASTORE_QUERY_VIDEO, MEDIASTORE_QUERY_PATH_VIDEO, MEDIASTORE_CREATE_VIDEO, MEDIASTORE_READ_VIDEO,
         MEDIASTORE_WRITE_VIDEO, MEDIASTORE_DELETE_VIDEO, MEDIASTORE_THUMBNAIL_VIDEO ->
             IMediaStoreApi.MediaType.VIDEO
 
-        MEDIASTORE_QUERY_AUDIO, MEDIASTORE_CREATE_AUDIO, MEDIASTORE_READ_AUDIO,
+        MEDIASTORE_QUERY_AUDIO, MEDIASTORE_QUERY_PATH_AUDIO, MEDIASTORE_CREATE_AUDIO, MEDIASTORE_READ_AUDIO,
         MEDIASTORE_WRITE_AUDIO, MEDIASTORE_DELETE_AUDIO ->
             IMediaStoreApi.MediaType.AUDIO
 
-        MEDIASTORE_QUERY_FILE, MEDIASTORE_CREATE_FILE, MEDIASTORE_READ_FILE,
+        MEDIASTORE_QUERY_FILE, MEDIASTORE_QUERY_PATH_FILE, MEDIASTORE_CREATE_FILE, MEDIASTORE_READ_FILE,
         MEDIASTORE_WRITE_FILE, MEDIASTORE_DELETE_FILE ->
             IMediaStoreApi.MediaType.FILE
 
-        MEDIASTORE_QUERY_DOWNLOAD, MEDIASTORE_CREATE_DOWNLOAD, MEDIASTORE_READ_DOWNLOAD,
+        MEDIASTORE_QUERY_DOWNLOAD, MEDIASTORE_QUERY_PATH_DOWNLOAD, MEDIASTORE_CREATE_DOWNLOAD, MEDIASTORE_READ_DOWNLOAD,
         MEDIASTORE_WRITE_DOWNLOAD, MEDIASTORE_DELETE_DOWNLOAD ->
             IMediaStoreApi.MediaType.DOWNLOAD
 
@@ -93,6 +113,10 @@ enum class TestCase(val id: String) {
     fun requiresFilePath(): Boolean = this in setOf(
         FILE_READ, FILE_WRITE, FILE_WRITE_DENIED, FILE_DELETE, FILE_DELETE_DENIED, FILE_CREATE,
         FILE_MKDIR, FILE_MKDIR_DENIED, FILE_RENAME, FILE_RENAME_DENIED,
+        FILE_STAT, FILE_ACCESS, FILE_READLINK, FILE_TRUNCATE, FILE_TRUNCATE_DENIED,
+        FILE_FTRUNCATE, FILE_FTRUNCATE_DENIED, FILE_CHMOD, FILE_CHMOD_DENIED,
+        FILE_FCHMOD, FILE_FCHMOD_DENIED, FILE_LINK, FILE_LINK_DENIED,
+        FILE_SYMLINK, FILE_SYMLINK_DENIED,
     )
 
     fun requiresFileDir(): Boolean = this == FILE_LIST_DIR
@@ -108,6 +132,11 @@ enum class TestCase(val id: String) {
             MEDIASTORE_QUERY_AUDIO -> mediaStore.queryAudio()
             MEDIASTORE_QUERY_FILE -> mediaStore.queryFile()
             MEDIASTORE_QUERY_DOWNLOAD -> mediaStore.queryDownload()
+            MEDIASTORE_QUERY_PATH_IMAGE -> mediaStore.queryImagePath(args)
+            MEDIASTORE_QUERY_PATH_VIDEO -> mediaStore.queryVideoPath(args)
+            MEDIASTORE_QUERY_PATH_AUDIO -> mediaStore.queryAudioPath(args)
+            MEDIASTORE_QUERY_PATH_FILE -> mediaStore.queryFilePath(args)
+            MEDIASTORE_QUERY_PATH_DOWNLOAD -> mediaStore.queryDownloadPath(args)
 
             MEDIASTORE_CREATE_IMAGE -> mediaStore.createImage(args)
             MEDIASTORE_CREATE_VIDEO -> mediaStore.createVideo(args)
@@ -147,6 +176,21 @@ enum class TestCase(val id: String) {
             FILE_MKDIR_DENIED -> file.mkdirDenied(args)
             FILE_RENAME -> file.rename(args)
             FILE_RENAME_DENIED -> file.renameDenied(args)
+            FILE_STAT -> file.stat(args)
+            FILE_ACCESS -> file.access(args)
+            FILE_READLINK -> file.readlink(args)
+            FILE_TRUNCATE -> file.truncate(args)
+            FILE_TRUNCATE_DENIED -> file.truncateDenied(args)
+            FILE_FTRUNCATE -> file.ftruncate(args)
+            FILE_FTRUNCATE_DENIED -> file.ftruncateDenied(args)
+            FILE_CHMOD -> file.chmod(args)
+            FILE_CHMOD_DENIED -> file.chmodDenied(args)
+            FILE_FCHMOD -> file.fchmod(args)
+            FILE_FCHMOD_DENIED -> file.fchmodDenied(args)
+            FILE_LINK -> file.link(args)
+            FILE_LINK_DENIED -> file.linkDenied(args)
+            FILE_SYMLINK -> file.symlink(args)
+            FILE_SYMLINK_DENIED -> file.symlinkDenied(args)
         }
     }
 

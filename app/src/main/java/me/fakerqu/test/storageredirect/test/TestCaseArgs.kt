@@ -14,6 +14,9 @@ data class TestCaseArgs(
     val fileName: String? = null,
     val payload: ByteArray? = null,
     val expectedPayload: ByteArray? = null,
+    val expectedPath: String? = null,
+    val length: Long? = null,
+    val mode: Int? = null,
 ) {
     fun payloadOr(default: ByteArray): ByteArray = payload ?: default
 
@@ -27,6 +30,9 @@ data class TestCaseArgs(
         const val EXTRA_FILE_NAME = "file_name"
         const val EXTRA_PAYLOAD = "payload"
         const val EXTRA_EXPECTED_PAYLOAD = "expected_payload"
+        const val EXTRA_EXPECTED_PATH = "expected_path"
+        const val EXTRA_LENGTH = "length"
+        const val EXTRA_MODE = "mode"
 
         fun fromIntent(intent: Intent?): TestCaseArgs {
             if (intent == null) return TestCaseArgs()
@@ -39,6 +45,9 @@ data class TestCaseArgs(
                 payload = intent.getStringExtra(EXTRA_PAYLOAD)?.toByteArray(Charsets.UTF_8),
                 expectedPayload = intent.getStringExtra(EXTRA_EXPECTED_PAYLOAD)
                     ?.toByteArray(Charsets.UTF_8),
+                expectedPath = intent.getStringExtra(EXTRA_EXPECTED_PATH),
+                length = intent.getStringExtra(EXTRA_LENGTH)?.toLongOrNull(),
+                mode = intent.getStringExtra(EXTRA_MODE)?.let(::parseMode),
             )
         }
 
@@ -52,9 +61,25 @@ data class TestCaseArgs(
                 EXTRA_FILE_NAME,
                 EXTRA_PAYLOAD,
                 EXTRA_EXPECTED_PAYLOAD,
+                EXTRA_EXPECTED_PATH,
+                EXTRA_LENGTH,
+                EXTRA_MODE,
                 me.fakerqu.test.storageredirect.receiver.TestCaseReceiver.EXTRA_TEST_CASE,
             ).forEach { key ->
                 from.getStringExtra(key)?.let { to.putExtra(key, it) }
+            }
+        }
+
+        private fun parseMode(value: String): Int? {
+            val trimmed = value.trim()
+            return when {
+                trimmed.startsWith("0o", ignoreCase = true) ->
+                    trimmed.drop(2).toIntOrNull(8)
+
+                trimmed.startsWith("0") && trimmed.length > 1 ->
+                    trimmed.toIntOrNull(8)
+
+                else -> trimmed.toIntOrNull()
             }
         }
     }

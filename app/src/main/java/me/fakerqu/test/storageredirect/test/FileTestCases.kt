@@ -1,5 +1,6 @@
 package me.fakerqu.test.storageredirect.test
 
+import android.system.OsConstants
 import android.content.Context
 import me.fakerqu.media_store_api.FileApiImpl
 import java.io.File
@@ -320,6 +321,89 @@ class FileTestCases(private val context: Context) {
         )
     }
 
+    fun stat(args: TestCaseArgs): TestResult = TestCase.FILE_STAT.measure {
+        val targetPath = args.requireFilePath(TestCase.FILE_STAT)
+            ?: return@measure args.missingPathResult(TestCase.FILE_STAT)
+        val stat = api.statFile(targetPath)
+        TestCase.FILE_STAT.pass(
+            message = "stat succeeded",
+            metadata = pathMetadata(targetPath) + statMetadata(stat),
+        )
+    }
+
+    fun access(args: TestCaseArgs): TestResult = TestCase.FILE_ACCESS.measure {
+        val targetPath = args.requireFilePath(TestCase.FILE_ACCESS)
+            ?: return@measure args.missingPathResult(TestCase.FILE_ACCESS)
+        val mode = args.mode ?: OsConstants.F_OK
+        val accessible = api.accessFile(targetPath, mode)
+        if (!accessible) {
+            return@measure TestCase.FILE_ACCESS.fail(
+                message = "access returned false",
+                metadata = pathMetadata(targetPath) + mapOf("mode" to mode.toString()),
+            )
+        }
+        TestCase.FILE_ACCESS.pass(
+            message = "access succeeded",
+            metadata = pathMetadata(targetPath) + mapOf("mode" to mode.toString()),
+        )
+    }
+
+    fun readlink(args: TestCaseArgs): TestResult = TestCase.FILE_READLINK.measure {
+        val targetPath = args.requireFilePath(TestCase.FILE_READLINK)
+            ?: return@measure args.missingPathResult(TestCase.FILE_READLINK)
+        val actual = api.readLink(targetPath)
+        val expected = args.expectedPath ?: args.expectedPayload?.toString(Charsets.UTF_8)
+        if (expected != null && actual != expected) {
+            return@measure TestCase.FILE_READLINK.fail(
+                message = "readlink target mismatch",
+                metadata = pathMetadata(targetPath) + mapOf(
+                    "expectedPath" to expected,
+                    "actualPath" to actual,
+                ),
+            )
+        }
+        TestCase.FILE_READLINK.pass(
+            message = "readlink succeeded",
+            metadata = pathMetadata(targetPath) + mapOf("target" to actual),
+        )
+    }
+
+    fun truncate(args: TestCaseArgs): TestResult =
+        truncateCommon(TestCase.FILE_TRUNCATE, args, useFd = false, expectDenied = false)
+
+    fun truncateDenied(args: TestCaseArgs): TestResult =
+        truncateCommon(TestCase.FILE_TRUNCATE_DENIED, args, useFd = false, expectDenied = true)
+
+    fun ftruncate(args: TestCaseArgs): TestResult =
+        truncateCommon(TestCase.FILE_FTRUNCATE, args, useFd = true, expectDenied = false)
+
+    fun ftruncateDenied(args: TestCaseArgs): TestResult =
+        truncateCommon(TestCase.FILE_FTRUNCATE_DENIED, args, useFd = true, expectDenied = true)
+
+    fun chmod(args: TestCaseArgs): TestResult =
+        chmodCommon(TestCase.FILE_CHMOD, args, useFd = false, expectDenied = false)
+
+    fun chmodDenied(args: TestCaseArgs): TestResult =
+        chmodCommon(TestCase.FILE_CHMOD_DENIED, args, useFd = false, expectDenied = true)
+
+    fun fchmod(args: TestCaseArgs): TestResult =
+        chmodCommon(TestCase.FILE_FCHMOD, args, useFd = true, expectDenied = false)
+
+    fun fchmodDenied(args: TestCaseArgs): TestResult =
+        chmodCommon(TestCase.FILE_FCHMOD_DENIED, args, useFd = true, expectDenied = true)
+
+    fun link(args: TestCaseArgs): TestResult =
+        linkCommon(TestCase.FILE_LINK, args, symbolic = false, expectDenied = false)
+
+    fun linkDenied(args: TestCaseArgs): TestResult =
+        linkCommon(TestCase.FILE_LINK_DENIED, args, symbolic = false, expectDenied = true)
+
+    fun symlink(args: TestCaseArgs): TestResult =
+        linkCommon(TestCase.FILE_SYMLINK, args, symbolic = true, expectDenied = false)
+
+    fun symlinkDenied(args: TestCaseArgs): TestResult =
+        linkCommon(TestCase.FILE_SYMLINK_DENIED, args, symbolic = true, expectDenied = true)
+
     fun prepareBootstrapDir(caseId: String): File {
         val dir = File(defaultRoot, caseId)
         if (dir.exists()) dir.deleteRecursively()
@@ -331,6 +415,183 @@ class FileTestCases(private val context: Context) {
 
     private fun renameMetadata(fromPath: String, toPath: String): Map<String, String> =
         mapOf("from" to fromPath, "to" to toPath)
+
+    private fun statMetadata(stat: me.fakerqu.media_store_api.FileStatInfo): Map<String, String> =
+        mapOf(
+            "size" to stat.size.toString(),
+            "mode" to stat.mode.toString(),
+            "uid" to stat.uid.toString(),
+            "gid" to stat.gid.toString(),
+            "modifiedSeconds" to stat.modifiedSeconds.toString(),
+        )
+
+    private fun truncateCommon(
+        testCase: TestCase,
+        args: TestCaseArgs,
+        useFd: Boolean,
+        expectDenied: Boolean,
+    ): TestResult = testCase.measure {
+        val targetPath = args.requireFilePath(testCase)
+            ?: return@measure args.missingPathResult(testCase)
+        val target = File(targetPath)
+        if (!target.isFile) {
+            return@measure testCase.fail(
+                message = "file does not exist before truncate",
+                metadata = pathMetadata(targetPath),
+            )
+        }
+        val originalSize = target.length()
+        val length = args.length ?: DEFAULT_TRUNCATE_LENGTH
+        try {
+            if (useFd) {
+                api.ftruncateFile(targetPath, length)
+            } else {
+                api.truncateFile(targetPath, length)
+            }
+        } catch (e: Exception) {
+            return@measure if (expectDenied) {
+                testCase.pass(
+                    message = "truncate denied as expected",
+                    metadata = pathMetadata(targetPath) + exceptionMetadata(e),
+                )
+            } else {
+                testCase.fail(
+                    message = "truncate failed",
+                    metadata = pathMetadata(targetPath) + exceptionMetadata(e),
+                )
+            }
+        }
+
+        val actualSize = target.length()
+        if (expectDenied) {
+            return@measure testCase.fail(
+                message = "truncate unexpectedly succeeded",
+                metadata = pathMetadata(targetPath) + mapOf(
+                    "originalSize" to originalSize.toString(),
+                    "actualSize" to actualSize.toString(),
+                ),
+            )
+        }
+        if (actualSize != length) {
+            return@measure testCase.fail(
+                message = "truncate length mismatch",
+                metadata = pathMetadata(targetPath) + mapOf(
+                    "expectedSize" to length.toString(),
+                    "actualSize" to actualSize.toString(),
+                ),
+            )
+        }
+        testCase.pass(
+            message = "truncate succeeded",
+            metadata = pathMetadata(targetPath) + mapOf("size" to actualSize.toString()),
+        )
+    }
+
+    private fun chmodCommon(
+        testCase: TestCase,
+        args: TestCaseArgs,
+        useFd: Boolean,
+        expectDenied: Boolean,
+    ): TestResult = testCase.measure {
+        val targetPath = args.requireFilePath(testCase)
+            ?: return@measure args.missingPathResult(testCase)
+        if (!File(targetPath).exists()) {
+            return@measure testCase.fail(
+                message = "path does not exist before chmod",
+                metadata = pathMetadata(targetPath),
+            )
+        }
+        val mode = args.mode ?: DEFAULT_CHMOD_MODE
+        try {
+            if (useFd) {
+                api.fchmodFile(targetPath, mode)
+            } else {
+                api.chmodFile(targetPath, mode)
+            }
+        } catch (e: Exception) {
+            return@measure if (expectDenied) {
+                testCase.pass(
+                    message = "chmod denied as expected",
+                    metadata = pathMetadata(targetPath) + exceptionMetadata(e),
+                )
+            } else {
+                testCase.fail(
+                    message = "chmod failed",
+                    metadata = pathMetadata(targetPath) + exceptionMetadata(e),
+                )
+            }
+        }
+        if (expectDenied) {
+            return@measure testCase.fail(
+                message = "chmod unexpectedly succeeded",
+                metadata = pathMetadata(targetPath) + mapOf("mode" to mode.toString()),
+            )
+        }
+        testCase.pass(
+            message = "chmod succeeded",
+            metadata = pathMetadata(targetPath) + mapOf("mode" to mode.toString()),
+        )
+    }
+
+    private fun linkCommon(
+        testCase: TestCase,
+        args: TestCaseArgs,
+        symbolic: Boolean,
+        expectDenied: Boolean,
+    ): TestResult = testCase.measure {
+        val fromPath = args.requireFilePath(testCase)
+            ?: return@measure args.missingPathResult(testCase)
+        val toPath = args.requireTargetFilePath(testCase)
+            ?: return@measure args.missingTargetPathResult(testCase)
+        val target = File(toPath)
+        target.parentFile?.mkdirs()
+        if (target.exists()) {
+            return@measure testCase.fail(
+                message = "target already exists before link",
+                metadata = renameMetadata(fromPath, toPath),
+            )
+        }
+        try {
+            if (symbolic) {
+                api.symlinkFile(fromPath, toPath)
+            } else {
+                api.linkFile(fromPath, toPath)
+            }
+        } catch (e: Exception) {
+            return@measure if (expectDenied) {
+                testCase.pass(
+                    message = "link denied as expected",
+                    metadata = renameMetadata(fromPath, toPath) + exceptionMetadata(e),
+                )
+            } else {
+                testCase.fail(
+                    message = "link failed",
+                    metadata = renameMetadata(fromPath, toPath) + exceptionMetadata(e),
+                )
+            }
+        }
+        if (expectDenied) {
+            return@measure testCase.fail(
+                message = "link unexpectedly succeeded",
+                metadata = renameMetadata(fromPath, toPath),
+            )
+        }
+        val created = if (symbolic) {
+            runCatching { api.readLink(toPath) == fromPath }.getOrDefault(false)
+        } else {
+            target.exists()
+        }
+        if (!created) {
+            return@measure testCase.fail(
+                message = "link target missing after operation",
+                metadata = renameMetadata(fromPath, toPath),
+            )
+        }
+        testCase.pass(
+            message = "link succeeded",
+            metadata = renameMetadata(fromPath, toPath),
+        )
+    }
 
     private fun exceptionMetadata(e: Exception): Map<String, String> =
         mapOf("exception" to e.javaClass.simpleName, "error" to (e.message ?: ""))
@@ -349,6 +610,8 @@ class FileTestCases(private val context: Context) {
         private const val MAX_LISTED_ENTRIES = 40
         private const val EXISTS_RETRY_COUNT = 10
         private const val EXISTS_RETRY_DELAY_MS = 100L
+        private const val DEFAULT_TRUNCATE_LENGTH = 4L
+        private const val DEFAULT_CHMOD_MODE = 384
     }
 }
 

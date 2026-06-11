@@ -67,10 +67,12 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
         if (fileName.isBlank() || content.isEmpty()) return null
         val collectionUri = resolveCollectionUri(mediaType, volumeType)
         val mimeType = guessMimeType(fileName, mediaType)
+        val relativePath = resolveRelativePath(mediaType)
+        deleteExistingMediaRows(collectionUri, relativePath, fileName)
         val pendingValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
             put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, resolveRelativePath(mediaType))
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
             if (mediaType == IMediaStoreApi.MediaType.FILE) {
                 put(
@@ -112,7 +114,30 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
                 context.contentResolver.delete(uri, null, null)
             } catch (_: Exception) {
             }
+            deleteExistingMediaRows(collectionUri, relativePath, fileName)
             null
+        }
+    }
+
+    private fun deleteExistingMediaRows(collectionUri: Uri, relativePath: String, fileName: String) {
+        val normalizedRelative = relativePath.trim('/')
+        val publicSuffix = "/$normalizedRelative/$fileName"
+        val sandboxSuffix = "/Android/data/${context.packageName}/sdcard$publicSuffix"
+        try {
+            context.contentResolver.delete(
+                collectionUri,
+                "${MediaStore.MediaColumns.DISPLAY_NAME}=? AND " +
+                    "(${MediaStore.MediaColumns.RELATIVE_PATH}=? OR " +
+                    "${MediaStore.MediaColumns.DATA} LIKE ? OR " +
+                    "${MediaStore.MediaColumns.DATA} LIKE ?)",
+                arrayOf(
+                    fileName,
+                    relativePath,
+                    "%$publicSuffix",
+                    "%$sandboxSuffix",
+                ),
+            )
+        } catch (_: Exception) {
         }
     }
 

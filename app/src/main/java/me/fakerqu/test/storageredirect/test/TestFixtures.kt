@@ -11,22 +11,27 @@ object TestFixtures {
         IMediaStoreApi.MediaType.IMAGE ->
             arrayOf(
                 MediaStore.Images.ImageColumns._ID,
+                MediaStore.MediaColumns.DISPLAY_NAME,
                 MediaStore.Images.ImageColumns.RELATIVE_PATH,
                 MediaStore.Images.ImageColumns.TITLE,
                 MediaStore.Images.ImageColumns.DATA,
+                MediaStore.Images.ImageColumns.BUCKET_ID,
             )
 
         IMediaStoreApi.MediaType.VIDEO ->
             arrayOf(
                 MediaStore.Video.VideoColumns._ID,
+                MediaStore.MediaColumns.DISPLAY_NAME,
                 MediaStore.Video.VideoColumns.RELATIVE_PATH,
                 MediaStore.Video.VideoColumns.TITLE,
                 MediaStore.Video.VideoColumns.DATA,
+                MediaStore.Video.VideoColumns.BUCKET_ID,
             )
 
         IMediaStoreApi.MediaType.AUDIO ->
             arrayOf(
                 MediaStore.Audio.AudioColumns._ID,
+                MediaStore.MediaColumns.DISPLAY_NAME,
                 MediaStore.Audio.AudioColumns.RELATIVE_PATH,
                 MediaStore.Audio.AudioColumns.TITLE,
                 MediaStore.Audio.AudioColumns.DATA,
@@ -35,6 +40,7 @@ object TestFixtures {
         IMediaStoreApi.MediaType.FILE ->
             arrayOf(
                 MediaStore.Files.FileColumns._ID,
+                MediaStore.MediaColumns.DISPLAY_NAME,
                 MediaStore.Files.FileColumns.RELATIVE_PATH,
                 MediaStore.Files.FileColumns.TITLE,
                 MediaStore.Files.FileColumns.DATA,
@@ -43,6 +49,7 @@ object TestFixtures {
         IMediaStoreApi.MediaType.DOWNLOAD ->
             arrayOf(
                 MediaStore.Downloads._ID,
+                MediaStore.MediaColumns.DISPLAY_NAME,
                 MediaStore.Downloads.RELATIVE_PATH,
                 MediaStore.Downloads.TITLE,
                 MediaStore.Downloads.DATA,
