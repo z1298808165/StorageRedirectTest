@@ -14,4 +14,8 @@ interface IFileApi {
     fun createFile(path: String): File
 
     fun deleteFile(path: String): Boolean
+
+    fun mkdir(path: String): Boolean
+
+    fun renameFile(fromPath: String, toPath: String): Boolean
 }

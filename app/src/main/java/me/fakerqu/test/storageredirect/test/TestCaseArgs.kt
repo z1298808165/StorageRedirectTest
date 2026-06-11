@@ -9,6 +9,7 @@ import android.net.Uri
 data class TestCaseArgs(
     val mediaUri: Uri? = null,
     val filePath: String? = null,
+    val targetFilePath: String? = null,
     val fileDir: String? = null,
     val fileName: String? = null,
     val payload: ByteArray? = null,
@@ -21,6 +22,7 @@ data class TestCaseArgs(
     companion object {
         const val EXTRA_MEDIA_URI = "media_uri"
         const val EXTRA_FILE_PATH = "file_path"
+        const val EXTRA_TARGET_FILE_PATH = "target_file_path"
         const val EXTRA_FILE_DIR = "file_dir"
         const val EXTRA_FILE_NAME = "file_name"
         const val EXTRA_PAYLOAD = "payload"
@@ -31,6 +33,7 @@ data class TestCaseArgs(
             return TestCaseArgs(
                 mediaUri = intent.getStringExtra(EXTRA_MEDIA_URI)?.let(Uri::parse),
                 filePath = intent.getStringExtra(EXTRA_FILE_PATH),
+                targetFilePath = intent.getStringExtra(EXTRA_TARGET_FILE_PATH),
                 fileDir = intent.getStringExtra(EXTRA_FILE_DIR),
                 fileName = intent.getStringExtra(EXTRA_FILE_NAME),
                 payload = intent.getStringExtra(EXTRA_PAYLOAD)?.toByteArray(Charsets.UTF_8),
@@ -44,6 +47,7 @@ data class TestCaseArgs(
             listOf(
                 EXTRA_MEDIA_URI,
                 EXTRA_FILE_PATH,
+                EXTRA_TARGET_FILE_PATH,
                 EXTRA_FILE_DIR,
                 EXTRA_FILE_NAME,
                 EXTRA_PAYLOAD,

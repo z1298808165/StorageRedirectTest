@@ -39,4 +39,13 @@ class FileApiImpl : IFileApi {
             file.deleteRecursively()
         }
     }
+
+    override fun mkdir(path: String): Boolean {
+        val file = File(path)
+        return file.mkdirs() || file.isDirectory
+    }
+
+    override fun renameFile(fromPath: String, toPath: String): Boolean {
+        return File(fromPath).renameTo(File(toPath))
+    }
 }

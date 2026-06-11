@@ -131,7 +131,7 @@ class MediaStoreTestCases(context: Context) {
     ): TestResult = testCase.measure {
         val uri = args.requireMediaUri(testCase) ?: return@measure args.missingUriResult(testCase)
         val expected = args.expectedPayload
-        val readBack = api.readMedia(uri)?.use { it.readBytes() }
+        val readBack = readMediaBytesWithRetry(uri)
         if (readBack == null) {
             return@measure testCase.fail(
                 message = "readMedia returned null",
@@ -160,14 +160,14 @@ class MediaStoreTestCases(context: Context) {
     ): TestResult = testCase.measure {
         val uri = args.requireMediaUri(testCase) ?: return@measure args.missingUriResult(testCase)
         val payload = args.payloadOr(TestFixtures.updatedPayload(mediaType))
-        if (!api.writeMedia(uri, payload)) {
+        if (!writeMediaWithRetry(uri, payload)) {
             return@measure testCase.fail(
                 message = "writeMedia returned false",
                 metadata = uriMetadata(uri),
             )
         }
         if (args.expectedPayload != null) {
-            val readBack = api.readMedia(uri)?.use { it.readBytes() }
+            val readBack = readMediaBytesWithRetry(uri)
             if (readBack == null || !readBack.contentEquals(args.expectedPayload)) {
                 return@measure testCase.fail(
                     message = "read after write did not match expected_payload",
@@ -211,7 +211,40 @@ class MediaStoreTestCases(context: Context) {
         )
     }
 
+    private fun readMediaBytesWithRetry(uri: Uri): ByteArray? {
+        var lastError: Exception? = null
+        repeat(IO_RETRY_COUNT) { index ->
+            try {
+                return api.readMedia(uri)?.use { it.readBytes() }
+            } catch (e: Exception) {
+                lastError = e
+                if (index < IO_RETRY_COUNT - 1) {
+                    Thread.sleep(IO_RETRY_DELAY_MS)
+                }
+            }
+        }
+        lastError?.let { throw it }
+        return null
+    }
+
+    private fun writeMediaWithRetry(uri: Uri, payload: ByteArray): Boolean {
+        repeat(IO_RETRY_COUNT) { index ->
+            if (api.writeMedia(uri, payload)) {
+                return true
+            }
+            if (index < IO_RETRY_COUNT - 1) {
+                Thread.sleep(IO_RETRY_DELAY_MS)
+            }
+        }
+        return false
+    }
+
     private fun uriMetadata(uri: Uri): Map<String, String> = mapOf("uri" to uri.toString())
+
+    companion object {
+        private const val IO_RETRY_COUNT = 8
+        private const val IO_RETRY_DELAY_MS = 150L
+    }
 }
 
 private fun TestCaseArgs.requireMediaUri(testCase: TestCase): Uri? = mediaUri

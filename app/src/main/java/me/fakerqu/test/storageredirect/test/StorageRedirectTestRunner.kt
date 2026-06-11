@@ -19,7 +19,7 @@ class StorageRedirectTestRunner(private val context: Context) {
     }
 
     /**
-     * ALL 模式：不依赖外部 URI/路径，先 create 再将其作为参数传给 read/write/thumbnail。
+     * ALL 模式：不依赖外部 URI/路径，先 create 再将其作为参数传给 read/write。
      */
     private fun runAllExceptDelete(overrides: TestCaseArgs): List<TestResult> {
         val results = mutableListOf<TestResult>()
@@ -28,20 +28,18 @@ class StorageRedirectTestRunner(private val context: Context) {
 
         TestCase.executableCases
             .filter { it.id.startsWith("mediastore_query") }
-            .forEach { results += it.run(context, overrides) }
+            .forEach { results += runLogged(it, overrides) }
 
         val mediaTypes = listOf(
             IMediaStoreApi.MediaType.IMAGE to listOf(
                 TestCase.MEDIASTORE_CREATE_IMAGE,
                 TestCase.MEDIASTORE_READ_IMAGE,
                 TestCase.MEDIASTORE_WRITE_IMAGE,
-                TestCase.MEDIASTORE_THUMBNAIL_IMAGE,
             ),
             IMediaStoreApi.MediaType.VIDEO to listOf(
                 TestCase.MEDIASTORE_CREATE_VIDEO,
                 TestCase.MEDIASTORE_READ_VIDEO,
                 TestCase.MEDIASTORE_WRITE_VIDEO,
-                TestCase.MEDIASTORE_THUMBNAIL_VIDEO,
             ),
             IMediaStoreApi.MediaType.AUDIO to listOf(
                 TestCase.MEDIASTORE_CREATE_AUDIO,
@@ -62,7 +60,7 @@ class StorageRedirectTestRunner(private val context: Context) {
 
         for ((mediaType, chain) in mediaTypes) {
             val createCase = chain.first()
-            val createResult = createCase.run(context, overrides)
+            val createResult = runLogged(createCase, overrides)
             results += createResult
             val uri = createResult.metadata["uri"]?.let(Uri::parse)
             if (uri == null) {
@@ -86,11 +84,10 @@ class StorageRedirectTestRunner(private val context: Context) {
                         expectedPayload = updated,
                     )
 
-                    case.id.contains("_thumbnail_") -> TestCaseArgs(mediaUri = uri)
                     case.id.contains("_delete_") -> TestCaseArgs(mediaUri = uri)
                     else -> TestCaseArgs(mediaUri = uri)
                 }
-                results += case.run(context, caseArgs)
+                results += runLogged(case, caseArgs)
             }
         }
 
@@ -100,32 +97,38 @@ class StorageRedirectTestRunner(private val context: Context) {
             parentFile?.mkdirs()
             writeText("b")
         }
-        results += TestCase.FILE_LIST_DIR.run(
-            context,
+        results += runLogged(
+            TestCase.FILE_LIST_DIR,
             TestCaseArgs(fileDir = fileDir.absolutePath),
         )
 
         val filePath = File(fileCases.prepareBootstrapDir("all_file_rw"), "target.txt").absolutePath
         val filePayload = TestFixtures.filePayload("all")
-        results += TestCase.FILE_CREATE.run(
-            context,
+        results += runLogged(
+            TestCase.FILE_CREATE,
             TestCaseArgs(filePath = filePath, payload = filePayload)
         )
-        results += TestCase.FILE_READ.run(
-            context,
+        results += runLogged(
+            TestCase.FILE_READ,
             TestCaseArgs(filePath = filePath, expectedPayload = filePayload),
         )
-        results += TestCase.FILE_WRITE.run(
-            context,
+        results += runLogged(
+            TestCase.FILE_WRITE,
             TestCaseArgs(
                 filePath = filePath,
                 payload = TestFixtures.filePayload("all-updated"),
                 expectedPayload = TestFixtures.filePayload("all-updated"),
             ),
         )
-        results += TestCase.FILE_DELETE.run(context, TestCaseArgs(filePath = filePath))
 
         return results
+    }
+
+    private fun runLogged(testCase: TestCase, args: TestCaseArgs = TestCaseArgs()): TestResult {
+        Log.i(TAG, "running ${testCase.id}")
+        return testCase.run(context, args).also { result ->
+            Log.i(TAG, "completed ${result.toLogLine()}")
+        }
     }
 
     private fun logSummary(results: List<TestResult>) {

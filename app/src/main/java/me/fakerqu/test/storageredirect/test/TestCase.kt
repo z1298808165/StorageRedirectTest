@@ -46,7 +46,13 @@ enum class TestCase(val id: String) {
     FILE_CREATE("file_create"),
     FILE_READ("file_read"),
     FILE_WRITE("file_write"),
-    FILE_DELETE("file_delete");
+    FILE_WRITE_DENIED("file_write_denied"),
+    FILE_DELETE("file_delete"),
+    FILE_DELETE_DENIED("file_delete_denied"),
+    FILE_MKDIR("file_mkdir"),
+    FILE_MKDIR_DENIED("file_mkdir_denied"),
+    FILE_RENAME("file_rename"),
+    FILE_RENAME_DENIED("file_rename_denied");
 
     fun getMediaType(): IMediaStoreApi.MediaType? = when (this) {
         MEDIASTORE_QUERY_IMAGE, MEDIASTORE_CREATE_IMAGE, MEDIASTORE_READ_IMAGE,
@@ -85,7 +91,8 @@ enum class TestCase(val id: String) {
     }
 
     fun requiresFilePath(): Boolean = this in setOf(
-        FILE_READ, FILE_WRITE, FILE_DELETE, FILE_CREATE,
+        FILE_READ, FILE_WRITE, FILE_WRITE_DENIED, FILE_DELETE, FILE_DELETE_DENIED, FILE_CREATE,
+        FILE_MKDIR, FILE_MKDIR_DENIED, FILE_RENAME, FILE_RENAME_DENIED,
     )
 
     fun requiresFileDir(): Boolean = this == FILE_LIST_DIR
@@ -133,7 +140,13 @@ enum class TestCase(val id: String) {
             FILE_CREATE -> file.create(args)
             FILE_READ -> file.read(args)
             FILE_WRITE -> file.write(args)
+            FILE_WRITE_DENIED -> file.writeDenied(args)
             FILE_DELETE -> file.delete(args)
+            FILE_DELETE_DENIED -> file.deleteDenied(args)
+            FILE_MKDIR -> file.mkdir(args)
+            FILE_MKDIR_DENIED -> file.mkdirDenied(args)
+            FILE_RENAME -> file.rename(args)
+            FILE_RENAME_DENIED -> file.renameDenied(args)
         }
     }
 

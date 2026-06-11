@@ -34,54 +34,57 @@ class TestService : Service() {
 
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action != TestCaseReceiver.ACTION_TEST_CASE) {
+            stopSelfResult(startId)
+            return START_NOT_STICKY
+        }
+
         promoteToForeground()
 
-        if (intent?.action == TestCaseReceiver.ACTION_TEST_CASE) {
-            val testCase = TestCase.fromId(intent.getStringExtra(TestCaseReceiver.EXTRA_TEST_CASE))
-            val args = TestCaseArgs.fromIntent(intent)
-            executor.execute {
-                try {
-                    val results = try {
-                        StorageRedirectTestRunner(applicationContext).run(testCase, args)
-                    } catch (e: Throwable) {
-                        Log.e("StorageRedirectTest", "runner crashed", e)
-                        listOf(
-                            TestResult(
-                                testCase = testCase,
-                                passed = false,
-                                message = "runner crashed: ${e.javaClass.simpleName}",
-                                error = e.stackTraceToString(),
-                            )
+        val testCase = TestCase.fromId(intent.getStringExtra(TestCaseReceiver.EXTRA_TEST_CASE))
+        val args = TestCaseArgs.fromIntent(intent)
+        executor.execute {
+            try {
+                val results = try {
+                    StorageRedirectTestRunner(applicationContext).run(testCase, args)
+                } catch (e: Throwable) {
+                    Log.e("StorageRedirectTest", "runner crashed", e)
+                    listOf(
+                        TestResult(
+                            testCase = testCase,
+                            passed = false,
+                            message = "runner crashed: ${e.javaClass.simpleName}",
+                            error = e.stackTraceToString(),
                         )
-                    }
-                    val failed = results.count { !it.passed }
-                    val resultDir = getExternalFilesDir("test_case_result")
-                        ?: File(filesDir, "test_case_result")
-                    resultDir.mkdirs()
-                    val resultFile = File(resultDir, "result_${System.currentTimeMillis()}.txt")
-                    resultFile.bufferedWriter().use { writer ->
-                        results.forEach { result ->
-                            writer.write(result.toLogLine())
-                            writer.write("\n")
-                        }
-                        writer.flush()
-                    }
-
-                    if (failed > 0) {
-                        Log.w(
-                            "StorageRedirectTest",
-                            "completed with $failed failure(s) out of ${results.size}"
-                        )
-                    }
-                } finally {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        stopForeground(STOP_FOREGROUND_REMOVE)
-                    } else {
-                        @Suppress("DEPRECATION")
-                        stopForeground(true)
-                    }
-                    stopSelfResult(startId)
+                    )
                 }
+                val failed = results.count { !it.passed }
+                val resultDir = getExternalFilesDir("test_case_result")
+                    ?: File(filesDir, "test_case_result")
+                resultDir.mkdirs()
+                val resultFile = File(resultDir, "result_${System.currentTimeMillis()}.txt")
+                resultFile.bufferedWriter().use { writer ->
+                    results.forEach { result ->
+                        writer.write(result.toLogLine())
+                        writer.write("\n")
+                    }
+                    writer.flush()
+                }
+
+                if (failed > 0) {
+                    Log.w(
+                        "StorageRedirectTest",
+                        "completed with $failed failure(s) out of ${results.size}"
+                    )
+                }
+            } finally {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                } else {
+                    @Suppress("DEPRECATION")
+                    stopForeground(true)
+                }
+                stopSelfResult(startId)
             }
         }
         return START_NOT_STICKY

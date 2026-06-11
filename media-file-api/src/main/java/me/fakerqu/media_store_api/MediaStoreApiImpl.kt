@@ -48,7 +48,7 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
 
     override fun writeMedia(uri: Uri, content: ByteArray): Boolean {
         return try {
-            context.contentResolver.openOutputStream(uri)?.use {
+            context.contentResolver.openOutputStream(uri, "wt")?.use {
                 it.write(content)
                 it.flush()
                 true
@@ -85,7 +85,7 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
             null
         } ?: return null
         val written = try {
-            context.contentResolver.openOutputStream(uri)?.use { stream ->
+            context.contentResolver.openOutputStream(uri, "w")?.use { stream ->
                 stream.write(content)
                 stream.flush()
                 true

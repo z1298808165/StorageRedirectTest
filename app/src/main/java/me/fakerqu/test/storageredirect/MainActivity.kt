@@ -1,6 +1,5 @@
 package me.fakerqu.test.storageredirect
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,7 +14,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        startForegroundService(Intent(this, TestService::class.java))
         enableEdgeToEdge()
         setContent {
             MiuixTheme {
