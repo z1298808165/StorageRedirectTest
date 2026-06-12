@@ -173,6 +173,69 @@ clean_results() {
   adb_su "rm -rf '$RESULT_DIR' '$INTERNAL_RESULT_DIR' '$SANDBOX_RESULT_DIR'" >/dev/null
 }
 
+remove_test_target_artifacts() {
+  adb_su "rm -rf '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/SrtOther' '${REAL_ROOT}/Download/SrtOtherMapped' '${REAL_ROOT}/Download/SrtMapOnlyMapped' '${REAL_ROOT}/Download/SrtReadOnly' '${REAL_ROOT}/Download/SrtMapRO' '${REAL_ROOT}/Download/SrtAllow' '${REAL_ROOT}/Pictures/SrtLocked' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/SrtOther' '${PRIVATE_ROOT}/Download/SrtOtherMapped' '${PRIVATE_ROOT}/Download/SrtMapOnlyMapped' '${PRIVATE_ROOT}/Download/SrtReadOnly' '${PRIVATE_ROOT}/Download/SrtMapRO' '${PRIVATE_ROOT}/Download/SrtAllow' '${PRIVATE_ROOT}/Pictures/SrtLocked'; find '${REAL_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/Test' '${REAL_ROOT}/.xldownload' '${REAL_ROOT}/.xlDownload' '${PRIVATE_ROOT}/.xldownload' '${PRIVATE_ROOT}/.xlDownload' -maxdepth 1 -name '$TEST_FILE' -delete 2>/dev/null || true" >/dev/null
+  adb_su "rm -f '${REAL_ROOT}/Download/$ALLOW_PART_FILE' '${PRIVATE_ROOT}/Download/$ALLOW_PART_FILE' '${REAL_ROOT}/Download/$QMARK_SINGLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_SINGLE_FILE' '${REAL_ROOT}/Download/$QMARK_DOUBLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_DOUBLE_FILE'" >/dev/null
+  adb_su "rm -rf '${REAL_ROOT}/Download/SrtLegacy' '${REAL_ROOT}/Download/SrtQMark' '${REAL_ROOT}/Download/SrtLongest' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy' '${PRIVATE_ROOT}/Download/SrtQMark' '${PRIVATE_ROOT}/Download/SrtLongest' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped'" >/dev/null
+}
+
+remove_mediastore_rows_by_pattern() {
+  local collection="$1"
+  local name_regex="$2"
+  local path_regex="$3"
+
+  adb_su "content query --uri '$collection' --projection _id:_display_name:_data:relative_path 2>/dev/null || true" |
+    while IFS= read -r row; do
+      [[ "$row" =~ _id=([0-9]+) ]] || continue
+      local id="${BASH_REMATCH[1]}"
+      [[ "$row" =~ $name_regex ]] || continue
+      [[ "$row" =~ $path_regex ]] || continue
+      adb shell content delete --uri "$collection/$id" >/dev/null 2>&1 || true
+    done
+}
+
+remove_random_mediastore_rows() {
+  local app_regex="${APP_ID//./\\.}"
+  remove_mediastore_rows_by_pattern "content://media/external/images/media" '_display_name=srt_image_[0-9]+\.jpg(,|$)' "relative_path=Pictures/|_data=.*/Pictures/|_data=.*/Android/data/${app_regex}/sdcard/Pictures/"
+  remove_mediastore_rows_by_pattern "content://media/external/video/media" '_display_name=srt_video_[0-9]+\.mp4(,|$)' "relative_path=Movies/|_data=.*/Movies/|_data=.*/Android/data/${app_regex}/sdcard/Movies/"
+  remove_mediastore_rows_by_pattern "content://media/external/audio/media" '_display_name=srt_audio_[0-9]+\.mp3(,|$)' "relative_path=Music/|_data=.*/Music/|_data=.*/Android/data/${app_regex}/sdcard/Music/"
+  remove_mediastore_rows_by_pattern "content://media/external/file" '_display_name=srt_file_[0-9]+\.txt(,|$)' "relative_path=Documents/|_data=.*/Documents/|_data=.*/Android/data/${app_regex}/sdcard/Documents/"
+  remove_mediastore_rows_by_pattern "content://media/external/downloads" '_display_name=(srt_download_[0-9]+\.bin|srt_ci_probe\.part|srt_qmark_a\.txt|srt_qmark_ab\.txt)(,|$)' "relative_path=Download/|_data=.*/Download/|_data=.*/Android/data/${app_regex}/sdcard/Download/"
+}
+
+remove_random_physical_media_files() {
+  adb_su "find '$BACKEND_ROOT/Pictures' '$BACKEND_PRIVATE_ROOT/Pictures' -maxdepth 1 -type f -name 'srt_image_[0-9]*.jpg' -delete 2>/dev/null || true" >/dev/null
+  adb_su "find '$BACKEND_ROOT/Movies' '$BACKEND_PRIVATE_ROOT/Movies' -maxdepth 1 -type f -name 'srt_video_[0-9]*.mp4' -delete 2>/dev/null || true" >/dev/null
+  adb_su "find '$BACKEND_ROOT/Music' '$BACKEND_PRIVATE_ROOT/Music' -maxdepth 1 -type f -name 'srt_audio_[0-9]*.mp3' -delete 2>/dev/null || true" >/dev/null
+  adb_su "find '$BACKEND_ROOT/Documents' '$BACKEND_PRIVATE_ROOT/Documents' -maxdepth 1 -type f -name 'srt_file_[0-9]*.txt' -delete 2>/dev/null || true" >/dev/null
+  adb_su "find '$BACKEND_ROOT/Download' '$BACKEND_PRIVATE_ROOT/Download' -maxdepth 1 -type f -name 'srt_download_[0-9]*.bin' -delete 2>/dev/null || true" >/dev/null
+  adb_su "rm -rf '$BACKEND_ROOT/Android/data/$APP_ID/files/test_case_result' '$BACKEND_ROOT/Android/data/$APP_ID/files/srt_file_tests' '$INTERNAL_RESULT_DIR' '/data/data/$APP_ID/files/srt_file_tests' '$SANDBOX_RESULT_DIR' '$BACKEND_PRIVATE_ROOT/Android/data/$APP_ID/files/srt_file_tests' 2>/dev/null || true" >/dev/null
+}
+
+restart_media_provider() {
+  adb shell am force-stop com.android.providers.media.module >/dev/null 2>&1 || true
+  adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
+  adb_su "pkill -f com.android.providers.media.module 2>/dev/null || true; pkill -f com.google.android.providers.media.module 2>/dev/null || true" >/dev/null 2>&1 || true
+  sleep 2
+}
+
+cleanup_test_artifacts() {
+  local status=$?
+  if [ "${cleanup_done:-0}" -eq 1 ]; then
+    return "$status"
+  fi
+  cleanup_done=1
+  set +e
+  echo "== cleanup test artifacts =="
+  adb shell am force-stop "$APP_ID" >/dev/null 2>&1
+  clean_results >/dev/null 2>&1
+  remove_test_target_artifacts >/dev/null 2>&1
+  remove_random_mediastore_rows >/dev/null 2>&1
+  remove_random_physical_media_files >/dev/null 2>&1
+  restart_media_provider >/dev/null 2>&1
+  return "$status"
+}
+
 latest_result() {
   adb_su "ls -t '$RESULT_DIR'/result_*.txt '$INTERNAL_RESULT_DIR'/result_*.txt '$SANDBOX_RESULT_DIR'/result_*.txt 2>/dev/null | head -1" | tail -1
 }
@@ -537,12 +600,16 @@ run_scenario() {
   esac
 }
 
+cleanup_done=0
+trap cleanup_test_artifacts EXIT
+
 wait_boot_completed
 adb shell pm grant "$APP_ID" android.permission.READ_EXTERNAL_STORAGE >/dev/null 2>&1 || true
 adb shell pm grant "$APP_ID" android.permission.WRITE_EXTERNAL_STORAGE >/dev/null 2>&1 || true
 adb shell pm grant "$APP_ID" android.permission.READ_MEDIA_IMAGES >/dev/null 2>&1 || true
 adb shell pm grant "$APP_ID" android.permission.READ_MEDIA_VIDEO >/dev/null 2>&1 || true
 adb shell pm grant "$APP_ID" android.permission.READ_MEDIA_AUDIO >/dev/null 2>&1 || true
+restart_media_provider
 wait_storage_ready "initial"
 adb_su ": > '$LOG_PATH' 2>/dev/null || true" >/dev/null
 

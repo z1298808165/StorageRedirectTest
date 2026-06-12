@@ -48,6 +48,7 @@ $PrivateQMarkRoot = "$PrivateRoot/Download/SrtQMark"
 
 $script:Summary = New-Object System.Collections.Generic.List[object]
 $script:Failures = New-Object System.Collections.Generic.List[string]
+$script:CleanupDone = $false
 
 function Invoke-Adb {
     param([string[]]$Arguments)
@@ -202,6 +203,80 @@ function Wait-Storage {
 function Clear-Targets {
     Invoke-Su "rm -rf '$BackendRoot/Download/SrtProbe' '$BackendRoot/Download/SrtOther' '$BackendRoot/Download/SrtOtherMapped' '$BackendRoot/Download/SrtMapOnlyMapped' '$BackendRoot/Download/SrtReadOnly' '$BackendRoot/Download/SrtMapRO' '$BackendRoot/Download/SrtAllow' '$BackendRoot/Download/SrtLegacy' '$BackendRoot/Download/SrtQMark' '$BackendRoot/Download/SrtLongest' '$BackendRoot/Download/SrtLongestBase' '$BackendRoot/Download/SrtLongestDeep' '$BackendRoot/Download/SrtPriority' '$BackendRoot/Download/SrtPriorityMapped' '$BackendRoot/Pictures/SrtLocked' '$BackendPrivateRoot/Download/SrtProbe' '$BackendPrivateRoot/Download/SrtOther' '$BackendPrivateRoot/Download/SrtOtherMapped' '$BackendPrivateRoot/Download/SrtMapOnlyMapped' '$BackendPrivateRoot/Download/SrtReadOnly' '$BackendPrivateRoot/Download/SrtMapRO' '$BackendPrivateRoot/Download/SrtAllow' '$BackendPrivateRoot/Download/SrtLegacy' '$BackendPrivateRoot/Download/SrtQMark' '$BackendPrivateRoot/Download/SrtLongest' '$BackendPrivateRoot/Download/SrtLongestBase' '$BackendPrivateRoot/Download/SrtLongestDeep' '$BackendPrivateRoot/Download/SrtPriority' '$BackendPrivateRoot/Download/SrtPriorityMapped' '$BackendPrivateRoot/Pictures/SrtLocked'; rm -f '$BackendRoot/Download/$AllowPartFile' '$BackendPrivateRoot/Download/$AllowPartFile' '$BackendRoot/Download/$QMarkSingleFile' '$BackendPrivateRoot/Download/$QMarkSingleFile' '$BackendRoot/Download/$QMarkDoubleFile' '$BackendPrivateRoot/Download/$QMarkDoubleFile' '$BackendRoot/Download/Test/$TestFile' '$BackendPrivateRoot/Download/Test/$TestFile' '$BackendRoot/.xldownload/$TestFile' '$BackendRoot/.xlDownload/$TestFile' '$BackendPrivateRoot/.xldownload/$TestFile' '$BackendPrivateRoot/.xlDownload/$TestFile'" | Out-Null
     Invoke-Su "mkdir -p '$BackendRoot/Download/SrtProbe' '$BackendRoot/Download/Test' '$BackendRoot/Download/SrtMapOnlyMapped' '$BackendRoot/Download/SrtReadOnly' '$BackendRoot/Download/SrtMapRO' '$BackendRoot/Download/SrtAllow/tmp' '$BackendRoot/Download/SrtLegacy/tmp' '$BackendRoot/Download/SrtQMark/Keep1' '$BackendRoot/Download/SrtQMark/Keep12' '$BackendRoot/Download/SrtLongest/Deep' '$BackendRoot/Download/SrtLongestBase' '$BackendRoot/Download/SrtLongestDeep' '$BackendRoot/Download/SrtPriority' '$BackendRoot/Download/SrtPriorityMapped' '$BackendRoot/Pictures/SrtLocked' '$BackendRoot/.xldownload' '$BackendRoot/.xlDownload' '$BackendPrivateRoot/Download/SrtProbe' '$BackendPrivateRoot/Download/Test' '$BackendPrivateRoot/Download/SrtMapOnlyMapped' '$BackendPrivateRoot/Download/SrtReadOnly' '$BackendPrivateRoot/Download/SrtMapRO' '$BackendPrivateRoot/Download/SrtAllow/tmp' '$BackendPrivateRoot/Download/SrtLegacy/tmp' '$BackendPrivateRoot/Download/SrtQMark/Keep1' '$BackendPrivateRoot/Download/SrtQMark/Keep12' '$BackendPrivateRoot/Download/SrtLongest/Deep' '$BackendPrivateRoot/Download/SrtLongestBase' '$BackendPrivateRoot/Download/SrtLongestDeep' '$BackendPrivateRoot/Download/SrtPriority' '$BackendPrivateRoot/Download/SrtPriorityMapped' '$BackendPrivateRoot/Pictures/SrtLocked' '$BackendPrivateRoot/.xldownload' '$BackendPrivateRoot/.xlDownload'; chmod -R 777 '$BackendRoot/Download/SrtProbe' '$BackendRoot/Download/Test' '$BackendRoot/Download/SrtMapOnlyMapped' '$BackendRoot/Download/SrtReadOnly' '$BackendRoot/Download/SrtMapRO' '$BackendRoot/Download/SrtAllow' '$BackendRoot/Download/SrtLegacy' '$BackendRoot/Download/SrtQMark' '$BackendRoot/Download/SrtLongest' '$BackendRoot/Download/SrtLongestBase' '$BackendRoot/Download/SrtLongestDeep' '$BackendRoot/Download/SrtPriority' '$BackendRoot/Download/SrtPriorityMapped' '$BackendRoot/Pictures/SrtLocked' '$BackendPrivateRoot/Download/SrtProbe' '$BackendPrivateRoot/Download/Test' '$BackendPrivateRoot/Download/SrtMapOnlyMapped' '$BackendPrivateRoot/Download/SrtReadOnly' '$BackendPrivateRoot/Download/SrtMapRO' '$BackendPrivateRoot/Download/SrtAllow' '$BackendPrivateRoot/Download/SrtLegacy' '$BackendPrivateRoot/Download/SrtQMark' '$BackendPrivateRoot/Download/SrtLongest' '$BackendPrivateRoot/Download/SrtLongestBase' '$BackendPrivateRoot/Download/SrtLongestDeep' '$BackendPrivateRoot/Download/SrtPriority' '$BackendPrivateRoot/Download/SrtPriorityMapped' '$BackendPrivateRoot/Pictures/SrtLocked' 2>/dev/null || true; chmod 777 '$BackendRoot/.xldownload' '$BackendRoot/.xlDownload' '$BackendPrivateRoot/.xldownload' '$BackendPrivateRoot/.xlDownload' 2>/dev/null || true" | Out-Null
+}
+
+function Remove-TestTargetArtifacts {
+    Invoke-Su "rm -rf '$BackendRoot/Download/SrtProbe' '$BackendRoot/Download/SrtOther' '$BackendRoot/Download/SrtOtherMapped' '$BackendRoot/Download/SrtMapOnlyMapped' '$BackendRoot/Download/SrtReadOnly' '$BackendRoot/Download/SrtMapRO' '$BackendRoot/Download/SrtAllow' '$BackendRoot/Download/SrtLegacy' '$BackendRoot/Download/SrtQMark' '$BackendRoot/Download/SrtLongest' '$BackendRoot/Download/SrtLongestBase' '$BackendRoot/Download/SrtLongestDeep' '$BackendRoot/Download/SrtPriority' '$BackendRoot/Download/SrtPriorityMapped' '$BackendRoot/Pictures/SrtLocked' '$BackendPrivateRoot/Download/SrtProbe' '$BackendPrivateRoot/Download/SrtOther' '$BackendPrivateRoot/Download/SrtOtherMapped' '$BackendPrivateRoot/Download/SrtMapOnlyMapped' '$BackendPrivateRoot/Download/SrtReadOnly' '$BackendPrivateRoot/Download/SrtMapRO' '$BackendPrivateRoot/Download/SrtAllow' '$BackendPrivateRoot/Download/SrtLegacy' '$BackendPrivateRoot/Download/SrtQMark' '$BackendPrivateRoot/Download/SrtLongest' '$BackendPrivateRoot/Download/SrtLongestBase' '$BackendPrivateRoot/Download/SrtLongestDeep' '$BackendPrivateRoot/Download/SrtPriority' '$BackendPrivateRoot/Download/SrtPriorityMapped' '$BackendPrivateRoot/Pictures/SrtLocked'; rm -f '$BackendRoot/Download/$AllowPartFile' '$BackendPrivateRoot/Download/$AllowPartFile' '$BackendRoot/Download/$QMarkSingleFile' '$BackendPrivateRoot/Download/$QMarkSingleFile' '$BackendRoot/Download/$QMarkDoubleFile' '$BackendPrivateRoot/Download/$QMarkDoubleFile' '$BackendRoot/Download/Test/$TestFile' '$BackendPrivateRoot/Download/Test/$TestFile' '$BackendRoot/.xldownload/$TestFile' '$BackendRoot/.xlDownload/$TestFile' '$BackendPrivateRoot/.xldownload/$TestFile' '$BackendPrivateRoot/.xlDownload/$TestFile'" | Out-Null
+}
+
+function Remove-MediaStoreRowsByPattern {
+    param(
+        [string]$CollectionUri,
+        [string[]]$NamePatterns,
+        [string[]]$PathPatterns
+    )
+
+    $rows = @(Invoke-Su "content query --uri '$CollectionUri' --projection _id:_display_name:_data:relative_path 2>/dev/null || true")
+    foreach ($row in $rows) {
+        if ($row -notmatch "_id=(\d+)") { continue }
+        $id = $Matches[1]
+        $nameMatched = $false
+        foreach ($pattern in $NamePatterns) {
+            if ($row -match $pattern) {
+                $nameMatched = $true
+                break
+            }
+        }
+        if (-not $nameMatched) { continue }
+
+        $pathMatched = $false
+        foreach ($pattern in $PathPatterns) {
+            if ($row -match $pattern) {
+                $pathMatched = $true
+                break
+            }
+        }
+        if (-not $pathMatched) { continue }
+
+        Invoke-Adb @("shell", "content", "delete", "--uri", "$CollectionUri/$id") | Out-Null
+    }
+}
+
+function Remove-RandomMediaStoreRows {
+    $escapedAppId = [regex]::Escape($AppId)
+    Remove-MediaStoreRowsByPattern "content://media/external/images/media" @("_display_name=srt_image_\d+\.jpg(,|$)") @("relative_path=Pictures/", "_data=.*/Pictures/", "_data=.*/Android/data/$escapedAppId/sdcard/Pictures/")
+    Remove-MediaStoreRowsByPattern "content://media/external/video/media" @("_display_name=srt_video_\d+\.mp4(,|$)") @("relative_path=Movies/", "_data=.*/Movies/", "_data=.*/Android/data/$escapedAppId/sdcard/Movies/")
+    Remove-MediaStoreRowsByPattern "content://media/external/audio/media" @("_display_name=srt_audio_\d+\.mp3(,|$)") @("relative_path=Music/", "_data=.*/Music/", "_data=.*/Android/data/$escapedAppId/sdcard/Music/")
+    Remove-MediaStoreRowsByPattern "content://media/external/file" @("_display_name=srt_file_\d+\.txt(,|$)") @("relative_path=Documents/", "_data=.*/Documents/", "_data=.*/Android/data/$escapedAppId/sdcard/Documents/")
+    Remove-MediaStoreRowsByPattern "content://media/external/downloads" @("_display_name=srt_download_\d+\.bin(,|$)", "_display_name=srt_ci_probe\.part(,|$)", "_display_name=srt_qmark_a\.txt(,|$)", "_display_name=srt_qmark_ab\.txt(,|$)") @("relative_path=Download/", "_data=.*/Download/", "_data=.*/Android/data/$escapedAppId/sdcard/Download/")
+}
+
+function Remove-RandomPhysicalMediaFiles {
+    Invoke-Su "find '$BackendRoot/Pictures' '$BackendPrivateRoot/Pictures' -maxdepth 1 -type f -name 'srt_image_[0-9]*.jpg' -delete 2>/dev/null || true" | Out-Null
+    Invoke-Su "find '$BackendRoot/Movies' '$BackendPrivateRoot/Movies' -maxdepth 1 -type f -name 'srt_video_[0-9]*.mp4' -delete 2>/dev/null || true" | Out-Null
+    Invoke-Su "find '$BackendRoot/Music' '$BackendPrivateRoot/Music' -maxdepth 1 -type f -name 'srt_audio_[0-9]*.mp3' -delete 2>/dev/null || true" | Out-Null
+    Invoke-Su "find '$BackendRoot/Documents' '$BackendPrivateRoot/Documents' -maxdepth 1 -type f -name 'srt_file_[0-9]*.txt' -delete 2>/dev/null || true" | Out-Null
+    Invoke-Su "find '$BackendRoot/Download' '$BackendPrivateRoot/Download' -maxdepth 1 -type f -name 'srt_download_[0-9]*.bin' -delete 2>/dev/null || true" | Out-Null
+    Invoke-Su "rm -rf '$BackendRoot/Android/data/$AppId/files/test_case_result' '$BackendRoot/Android/data/$AppId/files/srt_file_tests' '$InternalResultDir' '/data/data/$AppId/files/srt_file_tests' '$SandboxResultDir' '$BackendPrivateRoot/Android/data/$AppId/files/srt_file_tests' 2>/dev/null || true" | Out-Null
+}
+
+function Restart-MediaProvider {
+    Invoke-Adb @("shell", "am", "force-stop", "com.android.providers.media.module") | Out-Null
+    Invoke-Adb @("shell", "am", "force-stop", "com.google.android.providers.media.module") | Out-Null
+    Invoke-Su "pkill -f com.android.providers.media.module 2>/dev/null || true; pkill -f com.google.android.providers.media.module 2>/dev/null || true" | Out-Null
+    Start-Sleep -Seconds 2
+}
+
+function Invoke-TestArtifactCleanup {
+    if ($script:CleanupDone) { return }
+    $script:CleanupDone = $true
+    Write-Host "== cleanup test artifacts =="
+    try { Invoke-Adb @("shell", "am", "force-stop", $AppId) | Out-Null } catch { Write-Warning "force-stop cleanup failed: $_" }
+    try { Clear-Results } catch { Write-Warning "result cleanup failed: $_" }
+    try { Remove-TestTargetArtifacts } catch { Write-Warning "target cleanup failed: $_" }
+    try { Remove-RandomMediaStoreRows } catch { Write-Warning "MediaStore cleanup failed: $_" }
+    try { Remove-RandomPhysicalMediaFiles } catch { Write-Warning "physical cleanup failed: $_" }
+    try { Restart-MediaProvider } catch { Write-Warning "MediaProvider restart failed: $_" }
 }
 
 function Restart-App {
@@ -464,38 +539,48 @@ function Invoke-BasicAll {
     $script:Summary.Add([pscustomobject]@{ Scenario = "basic"; Title = "deterministic all + query smoke"; Passed = $ok; NewFailures = ($script:Failures.Count - $before) }) | Out-Null
 }
 
-Invoke-Adb @("shell", "pm", "grant", $AppId, "android.permission.READ_EXTERNAL_STORAGE") | Out-Null
-Invoke-Adb @("shell", "pm", "grant", $AppId, "android.permission.WRITE_EXTERNAL_STORAGE") | Out-Null
-Invoke-Adb @("shell", "pm", "grant", $AppId, "android.permission.READ_MEDIA_IMAGES") | Out-Null
-Invoke-Adb @("shell", "pm", "grant", $AppId, "android.permission.READ_MEDIA_VIDEO") | Out-Null
-Invoke-Adb @("shell", "pm", "grant", $AppId, "android.permission.READ_MEDIA_AUDIO") | Out-Null
-Invoke-Adb @("shell", "appops", "set", $AppId, "MANAGE_EXTERNAL_STORAGE", "allow") | Out-Null
-Invoke-Adb @("logcat", "-c") | Out-Null
-Invoke-Su ": > '$LogPath' 2>/dev/null || true" | Out-Null
-Wait-Storage "initial" | Out-Null
+$script:ExitCode = 0
+try {
+    Invoke-Adb @("shell", "pm", "grant", $AppId, "android.permission.READ_EXTERNAL_STORAGE") | Out-Null
+    Invoke-Adb @("shell", "pm", "grant", $AppId, "android.permission.WRITE_EXTERNAL_STORAGE") | Out-Null
+    Invoke-Adb @("shell", "pm", "grant", $AppId, "android.permission.READ_MEDIA_IMAGES") | Out-Null
+    Invoke-Adb @("shell", "pm", "grant", $AppId, "android.permission.READ_MEDIA_VIDEO") | Out-Null
+    Invoke-Adb @("shell", "pm", "grant", $AppId, "android.permission.READ_MEDIA_AUDIO") | Out-Null
+    Invoke-Adb @("shell", "appops", "set", $AppId, "MANAGE_EXTERNAL_STORAGE", "allow") | Out-Null
+    Invoke-Adb @("logcat", "-c") | Out-Null
+    Invoke-Su ": > '$LogPath' 2>/dev/null || true" | Out-Null
+    Restart-MediaProvider
+    Wait-Storage "initial" | Out-Null
 
-if (-not $SkipBasicAll) {
-    Invoke-BasicAll
+    if (-not $SkipBasicAll) {
+        Invoke-BasicAll
+    }
+
+    foreach ($scenario in 1..15) {
+        Invoke-Scenario $scenario
+    }
+
+    Write-Host "== summary =="
+    $script:Summary | Format-Table -AutoSize | Out-String | Write-Host
+
+    if ($script:Failures.Count -gt 0) {
+        Write-Host "== failures =="
+        $script:Failures | ForEach-Object { Write-Host $_ }
+        Write-Host "== module log tail =="
+        Invoke-Su 'for log in running.log app_status.log file_monitor.log media_provider_state.log; do echo ---$log---; tail -80 /data/adb/modules/storage.redirect.x/logs/$log 2>/dev/null || true; done' | Write-Host
+        Write-Host "== relevant logcat tail =="
+        & adb -s $Serial logcat -d -t 500 |
+            Select-String -Pattern "StorageRedirectTest|srx|StorageRedirect|FATAL EXCEPTION|AndroidRuntime|MediaProvider|ExternalStorage|fuse|Transport endpoint" |
+            Select-Object -Last 160 |
+            ForEach-Object { Write-Host $_.Line }
+        $script:ExitCode = 1
+    } else {
+        Write-Host "ALL_SCENARIOS_PASSED"
+    }
+} finally {
+    Invoke-TestArtifactCleanup
 }
 
-foreach ($scenario in 1..15) {
-    Invoke-Scenario $scenario
+if ($script:ExitCode -ne 0) {
+    exit $script:ExitCode
 }
-
-Write-Host "== summary =="
-$script:Summary | Format-Table -AutoSize | Out-String | Write-Host
-
-if ($script:Failures.Count -gt 0) {
-    Write-Host "== failures =="
-    $script:Failures | ForEach-Object { Write-Host $_ }
-    Write-Host "== module log tail =="
-    Invoke-Su 'for log in running.log app_status.log file_monitor.log media_provider_state.log; do echo ---$log---; tail -80 /data/adb/modules/storage.redirect.x/logs/$log 2>/dev/null || true; done' | Write-Host
-    Write-Host "== relevant logcat tail =="
-    & adb -s $Serial logcat -d -t 500 |
-        Select-String -Pattern "StorageRedirectTest|srx|StorageRedirect|FATAL EXCEPTION|AndroidRuntime|MediaProvider|ExternalStorage|fuse|Transport endpoint" |
-        Select-Object -Last 160 |
-        ForEach-Object { Write-Host $_.Line }
-    exit 1
-}
-
-Write-Host "ALL_SCENARIOS_PASSED"

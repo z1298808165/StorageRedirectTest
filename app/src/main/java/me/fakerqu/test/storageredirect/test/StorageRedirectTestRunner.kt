@@ -26,115 +26,142 @@ class StorageRedirectTestRunner(private val context: Context) {
         val results = mutableListOf<TestResult>()
         val mediaStore = MediaStoreTestCases(context)
         val fileCases = FileTestCases(context)
+        val createdMedia = mutableListOf<Uri>()
+        val bootstrapDirs = mutableListOf<File>()
 
-        val mediaTypes = listOf(
-            IMediaStoreApi.MediaType.IMAGE to listOf(
-                TestCase.MEDIASTORE_CREATE_IMAGE,
-                TestCase.MEDIASTORE_READ_IMAGE,
-                TestCase.MEDIASTORE_WRITE_IMAGE,
-            ),
-            IMediaStoreApi.MediaType.VIDEO to listOf(
-                TestCase.MEDIASTORE_CREATE_VIDEO,
-                TestCase.MEDIASTORE_READ_VIDEO,
-                TestCase.MEDIASTORE_WRITE_VIDEO,
-            ),
-            IMediaStoreApi.MediaType.AUDIO to listOf(
-                TestCase.MEDIASTORE_CREATE_AUDIO,
-                TestCase.MEDIASTORE_READ_AUDIO,
-                TestCase.MEDIASTORE_WRITE_AUDIO,
-            ),
-            IMediaStoreApi.MediaType.FILE to listOf(
-                TestCase.MEDIASTORE_CREATE_FILE,
-                TestCase.MEDIASTORE_READ_FILE,
-                TestCase.MEDIASTORE_WRITE_FILE,
-            ),
-            IMediaStoreApi.MediaType.DOWNLOAD to listOf(
-                TestCase.MEDIASTORE_CREATE_DOWNLOAD,
-                TestCase.MEDIASTORE_READ_DOWNLOAD,
-                TestCase.MEDIASTORE_WRITE_DOWNLOAD,
-            ),
-        )
+        try {
+            val mediaTypes = listOf(
+                IMediaStoreApi.MediaType.IMAGE to listOf(
+                    TestCase.MEDIASTORE_CREATE_IMAGE,
+                    TestCase.MEDIASTORE_READ_IMAGE,
+                    TestCase.MEDIASTORE_WRITE_IMAGE,
+                ),
+                IMediaStoreApi.MediaType.VIDEO to listOf(
+                    TestCase.MEDIASTORE_CREATE_VIDEO,
+                    TestCase.MEDIASTORE_READ_VIDEO,
+                    TestCase.MEDIASTORE_WRITE_VIDEO,
+                ),
+                IMediaStoreApi.MediaType.AUDIO to listOf(
+                    TestCase.MEDIASTORE_CREATE_AUDIO,
+                    TestCase.MEDIASTORE_READ_AUDIO,
+                    TestCase.MEDIASTORE_WRITE_AUDIO,
+                ),
+                IMediaStoreApi.MediaType.FILE to listOf(
+                    TestCase.MEDIASTORE_CREATE_FILE,
+                    TestCase.MEDIASTORE_READ_FILE,
+                    TestCase.MEDIASTORE_WRITE_FILE,
+                ),
+                IMediaStoreApi.MediaType.DOWNLOAD to listOf(
+                    TestCase.MEDIASTORE_CREATE_DOWNLOAD,
+                    TestCase.MEDIASTORE_READ_DOWNLOAD,
+                    TestCase.MEDIASTORE_WRITE_DOWNLOAD,
+                ),
+            )
 
-        for ((mediaType, chain) in mediaTypes) {
-            val createCase = chain.first()
-            val createResult = runLogged(createCase, overrides)
-            results += createResult
-            val uri = createResult.metadata["uri"]?.let(Uri::parse)
-            if (uri == null) {
-                chain.drop(1).forEach { skipped ->
-                    results += skipped.fail("skipped: create did not return uri")
+            for ((mediaType, chain) in mediaTypes) {
+                val createCase = chain.first()
+                val createResult = runLogged(createCase, overrides)
+                results += createResult
+                val uri = createResult.metadata["uri"]?.let(Uri::parse)
+                if (uri == null) {
+                    chain.drop(1).forEach { skipped ->
+                        results += skipped.fail("skipped: create did not return uri")
+                    }
+                    continue
                 }
-                continue
-            }
-            val initial = TestFixtures.initialPayload(mediaType)
-            val updated = TestFixtures.updatedPayload(mediaType)
-            chain.drop(1).forEach { case ->
-                val caseArgs = when {
-                    case.id.contains("_read_") -> TestCaseArgs(
-                        mediaUri = uri,
-                        expectedPayload = initial,
-                    )
+                createdMedia += uri
+                val initial = TestFixtures.initialPayload(mediaType)
+                val updated = TestFixtures.updatedPayload(mediaType)
+                chain.drop(1).forEach { case ->
+                    val caseArgs = when {
+                        case.id.contains("_read_") -> TestCaseArgs(
+                            mediaUri = uri,
+                            expectedPayload = initial,
+                        )
 
-                    case.id.contains("_write_") -> TestCaseArgs(
-                        mediaUri = uri,
-                        payload = updated,
-                        expectedPayload = updated,
-                    )
+                        case.id.contains("_write_") -> TestCaseArgs(
+                            mediaUri = uri,
+                            payload = updated,
+                            expectedPayload = updated,
+                        )
 
-                    case.id.contains("_delete_") -> TestCaseArgs(mediaUri = uri)
-                    else -> TestCaseArgs(mediaUri = uri)
+                        case.id.contains("_delete_") -> TestCaseArgs(mediaUri = uri)
+                        else -> TestCaseArgs(mediaUri = uri)
+                    }
+                    results += runLogged(case, caseArgs)
                 }
-                results += runLogged(case, caseArgs)
             }
-        }
 
-        val fileDir = fileCases.prepareBootstrapDir("all_file_list")
-        File(fileDir, "a.txt").writeText("a")
-        File(fileDir, "nested/b.txt").apply {
-            parentFile?.mkdirs()
-            writeText("b")
-        }
-        results += runLogged(
-            TestCase.FILE_LIST_DIR,
-            TestCaseArgs(fileDir = fileDir.absolutePath),
-        )
+            val fileDir = fileCases.prepareBootstrapDir("all_file_list")
+            bootstrapDirs += fileDir
+            File(fileDir, "a.txt").writeText("a")
+            File(fileDir, "nested/b.txt").apply {
+                parentFile?.mkdirs()
+                writeText("b")
+            }
+            results += runLogged(
+                TestCase.FILE_LIST_DIR,
+                TestCaseArgs(fileDir = fileDir.absolutePath),
+            )
 
-        val filePath = File(fileCases.prepareBootstrapDir("all_file_rw"), "target.txt").absolutePath
-        val filePayload = TestFixtures.filePayload("all")
-        results += runLogged(
-            TestCase.FILE_CREATE,
-            TestCaseArgs(filePath = filePath, payload = filePayload)
-        )
-        results += runLogged(
-            TestCase.FILE_READ,
-            TestCaseArgs(filePath = filePath, expectedPayload = filePayload),
-        )
-        results += runLogged(
-            TestCase.FILE_WRITE,
-            TestCaseArgs(
-                filePath = filePath,
-                payload = TestFixtures.filePayload("all-updated"),
-                expectedPayload = TestFixtures.filePayload("all-updated"),
-            ),
-        )
-        results += runLogged(
-            TestCase.FILE_STAT,
-            TestCaseArgs(filePath = filePath),
-        )
-        results += runLogged(
-            TestCase.FILE_ACCESS,
-            TestCaseArgs(filePath = filePath),
-        )
-        results += runLogged(
-            TestCase.FILE_TRUNCATE,
-            TestCaseArgs(filePath = filePath, length = 4),
-        )
-        results += runLogged(
-            TestCase.FILE_FTRUNCATE,
-            TestCaseArgs(filePath = filePath, length = 8),
-        )
+            val fileRoot = fileCases.prepareBootstrapDir("all_file_rw")
+            bootstrapDirs += fileRoot
+            val filePath = File(fileRoot, "target.txt").absolutePath
+            val filePayload = TestFixtures.filePayload("all")
+            results += runLogged(
+                TestCase.FILE_CREATE,
+                TestCaseArgs(filePath = filePath, payload = filePayload)
+            )
+            results += runLogged(
+                TestCase.FILE_READ,
+                TestCaseArgs(filePath = filePath, expectedPayload = filePayload),
+            )
+            results += runLogged(
+                TestCase.FILE_WRITE,
+                TestCaseArgs(
+                    filePath = filePath,
+                    payload = TestFixtures.filePayload("all-updated"),
+                    expectedPayload = TestFixtures.filePayload("all-updated"),
+                ),
+            )
+            results += runLogged(
+                TestCase.FILE_STAT,
+                TestCaseArgs(filePath = filePath),
+            )
+            results += runLogged(
+                TestCase.FILE_ACCESS,
+                TestCaseArgs(filePath = filePath),
+            )
+            results += runLogged(
+                TestCase.FILE_TRUNCATE,
+                TestCaseArgs(filePath = filePath, length = 4),
+            )
+            results += runLogged(
+                TestCase.FILE_FTRUNCATE,
+                TestCaseArgs(filePath = filePath, length = 8),
+            )
+        } finally {
+            cleanupAllArtifacts(createdMedia, bootstrapDirs)
+        }
 
         return results
+    }
+
+    private fun cleanupAllArtifacts(createdMedia: List<Uri>, bootstrapDirs: List<File>) {
+        createdMedia.forEach { uri ->
+            try {
+                context.contentResolver.delete(uri, null, null)
+            } catch (e: Exception) {
+                Log.w(TAG, "failed to delete test media $uri", e)
+            }
+        }
+        bootstrapDirs.forEach { dir ->
+            try {
+                dir.deleteRecursively()
+            } catch (e: Exception) {
+                Log.w(TAG, "failed to delete test dir ${dir.absolutePath}", e)
+            }
+        }
     }
 
     private fun runLogged(testCase: TestCase, args: TestCaseArgs = TestCaseArgs()): TestResult {

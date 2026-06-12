@@ -91,7 +91,7 @@ adb shell "su -c 'ls -t /sdcard/Android/data/me.fakerqu.test.storageredirect/fil
 adb shell "su -c 'cat /sdcard/Android/data/me.fakerqu.test.storageredirect/files/test_case_result/result_*.txt 2>/dev/null | tail -80'"
 ```
 
-`test_case=all` 会运行查询、创建、读取、写入、`stat`、`access`、`truncate`、`ftruncate` 和文件 API 的主要路径，但不会自动执行 MediaStore 删除、缩略图、chmod、link 或 symlink 用例。它会创建 `srt_*` 开头的测试媒体文件，建议在测试机或可清理环境中运行。
+`test_case=all` 会运行查询、创建、读取、写入、`stat`、`access`、`truncate`、`ftruncate` 和文件 API 的主要路径，但不会自动执行 MediaStore 删除、缩略图、chmod、link 或 symlink 用例。它会创建 `srt_*` 开头的测试媒体文件，并在用例结束时删除本次记录下来的 MediaStore URI 和 `srt_file_tests` bootstrap 目录。单个 MediaStore create 用例仍会保留返回的 URI，便于后续手动 read/write/delete。
 
 ## 单个用例
 
@@ -205,6 +205,15 @@ bash .github/scripts/run-storage-redirect-scenarios.sh
 - 启用字符串形式 `sandboxed_paths` 且同路径也命中 `path_mappings`，验证映射优先于局部沙盒。
 
 脚本输出 `scenario-*-result.txt` 和 `media-health.txt`。失败时会抓取模块配置、模块日志、存储挂载状态和相关 logcat。
+
+脚本开跑前和清理后会重启 MediaProvider，避免上一轮 shell 侧 MediaStore 清理影响下一轮 MediaStore 写入归因。脚本结束时会执行设备侧清理，成功和失败都会尽量收尾。清理范围是白名单式的：
+
+- 测试 App 的 `test_case_result` 和 `srt_file_tests` 目录，包括被 SRX 重定向后的 App 私有镜像路径。
+- 场景脚本创建的 `Download/Srt*`、`Pictures/SrtLocked` 等固定测试目录，以及固定文件 `srt_ci_probe.part`、`srt_qmark_a.txt`、`srt_qmark_ab.txt`。
+- MediaStore 中名称匹配 `srt_image_<数字>.jpg`、`srt_video_<数字>.mp4`、`srt_audio_<数字>.mp3`、`srt_file_<数字>.txt`、`srt_download_<数字>.bin` 的测试行，并且只限定在对应的 Pictures、Movies、Music、Documents、Download 或测试 App 私有镜像路径。
+- 真实物理目录中同样命名规则的随机测试文件，只在上述公共媒体目录和测试 App 私有镜像目录的第一层删除。
+
+清理不会递归删除整个 `Download`、`Pictures` 等用户目录，也不会删除白名单之外的普通 `srt_*` 文件。`scenario-*-result.txt` 和 `media-health.txt` 是脚本在本仓库工作区生成的诊断文件，会保留给 CI 或本地排查使用。
 
 ## CI 行为
 
