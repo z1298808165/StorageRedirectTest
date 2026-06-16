@@ -12,6 +12,7 @@ data class TestCaseArgs(
     val targetFilePath: String? = null,
     val fileDir: String? = null,
     val fileName: String? = null,
+    val relativePath: String? = null,
     val payload: ByteArray? = null,
     val expectedPayload: ByteArray? = null,
     val expectedPath: String? = null,
@@ -28,6 +29,7 @@ data class TestCaseArgs(
         const val EXTRA_TARGET_FILE_PATH = "target_file_path"
         const val EXTRA_FILE_DIR = "file_dir"
         const val EXTRA_FILE_NAME = "file_name"
+        const val EXTRA_RELATIVE_PATH = "relative_path"
         const val EXTRA_PAYLOAD = "payload"
         const val EXTRA_EXPECTED_PAYLOAD = "expected_payload"
         const val EXTRA_EXPECTED_PATH = "expected_path"
@@ -42,6 +44,7 @@ data class TestCaseArgs(
                 targetFilePath = intent.getStringExtra(EXTRA_TARGET_FILE_PATH),
                 fileDir = intent.getStringExtra(EXTRA_FILE_DIR),
                 fileName = intent.getStringExtra(EXTRA_FILE_NAME),
+                relativePath = intent.getStringExtra(EXTRA_RELATIVE_PATH),
                 payload = intent.getStringExtra(EXTRA_PAYLOAD)?.toByteArray(Charsets.UTF_8),
                 expectedPayload = intent.getStringExtra(EXTRA_EXPECTED_PAYLOAD)
                     ?.toByteArray(Charsets.UTF_8),
@@ -59,6 +62,7 @@ data class TestCaseArgs(
                 EXTRA_TARGET_FILE_PATH,
                 EXTRA_FILE_DIR,
                 EXTRA_FILE_NAME,
+                EXTRA_RELATIVE_PATH,
                 EXTRA_PAYLOAD,
                 EXTRA_EXPECTED_PAYLOAD,
                 EXTRA_EXPECTED_PATH,

@@ -48,6 +48,7 @@ class TestCaseReceiver : BroadcastReceiver() {
         val EXTRA_FILE_PATH: String get() = TestCaseArgs.EXTRA_FILE_PATH
         val EXTRA_FILE_DIR: String get() = TestCaseArgs.EXTRA_FILE_DIR
         val EXTRA_FILE_NAME: String get() = TestCaseArgs.EXTRA_FILE_NAME
+        val EXTRA_RELATIVE_PATH: String get() = TestCaseArgs.EXTRA_RELATIVE_PATH
         val EXTRA_PAYLOAD: String get() = TestCaseArgs.EXTRA_PAYLOAD
         val EXTRA_EXPECTED_PAYLOAD: String get() = TestCaseArgs.EXTRA_EXPECTED_PAYLOAD
     }

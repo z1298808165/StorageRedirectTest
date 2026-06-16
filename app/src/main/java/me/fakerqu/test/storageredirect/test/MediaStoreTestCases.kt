@@ -45,17 +45,32 @@ class MediaStoreTestCases(context: Context) {
     fun createImage(args: TestCaseArgs): TestResult =
         create(TestCase.MEDIASTORE_CREATE_IMAGE, IMediaStoreApi.MediaType.IMAGE, args)
 
+    fun createImageDenied(args: TestCaseArgs): TestResult =
+        createDenied(TestCase.MEDIASTORE_CREATE_IMAGE_DENIED, IMediaStoreApi.MediaType.IMAGE, args)
+
     fun createVideo(args: TestCaseArgs): TestResult =
         create(TestCase.MEDIASTORE_CREATE_VIDEO, IMediaStoreApi.MediaType.VIDEO, args)
+
+    fun createVideoDenied(args: TestCaseArgs): TestResult =
+        createDenied(TestCase.MEDIASTORE_CREATE_VIDEO_DENIED, IMediaStoreApi.MediaType.VIDEO, args)
 
     fun createAudio(args: TestCaseArgs): TestResult =
         create(TestCase.MEDIASTORE_CREATE_AUDIO, IMediaStoreApi.MediaType.AUDIO, args)
 
+    fun createAudioDenied(args: TestCaseArgs): TestResult =
+        createDenied(TestCase.MEDIASTORE_CREATE_AUDIO_DENIED, IMediaStoreApi.MediaType.AUDIO, args)
+
     fun createFile(args: TestCaseArgs): TestResult =
         create(TestCase.MEDIASTORE_CREATE_FILE, IMediaStoreApi.MediaType.FILE, args)
 
+    fun createFileDenied(args: TestCaseArgs): TestResult =
+        createDenied(TestCase.MEDIASTORE_CREATE_FILE_DENIED, IMediaStoreApi.MediaType.FILE, args)
+
     fun createDownload(args: TestCaseArgs): TestResult =
         create(TestCase.MEDIASTORE_CREATE_DOWNLOAD, IMediaStoreApi.MediaType.DOWNLOAD, args)
+
+    fun createDownloadDenied(args: TestCaseArgs): TestResult =
+        createDenied(TestCase.MEDIASTORE_CREATE_DOWNLOAD_DENIED, IMediaStoreApi.MediaType.DOWNLOAD, args)
 
     fun readImage(args: TestCaseArgs): TestResult =
         read(TestCase.MEDIASTORE_READ_IMAGE, IMediaStoreApi.MediaType.IMAGE, args)
@@ -178,13 +193,41 @@ class MediaStoreTestCases(context: Context) {
     ): TestResult = testCase.measure {
         val payload = args.payloadOr(TestFixtures.initialPayload(mediaType))
         val fileName = args.fileName ?: TestFixtures.fileName(mediaType)
-        val uri = api.createMedia(mediaType, volume, fileName, payload)
+        val uri = api.createMedia(mediaType, volume, fileName, payload, args.relativePath)
             ?: return@measure testCase.fail("createMedia returned null")
         testCase.pass(
             message = "create succeeded",
             metadata = mapOf(
                 "uri" to uri.toString(),
                 "fileName" to fileName,
+                "relativePath" to args.relativePath.orEmpty(),
+            ),
+        )
+    }
+
+    private fun createDenied(
+        testCase: TestCase,
+        mediaType: IMediaStoreApi.MediaType,
+        args: TestCaseArgs,
+    ): TestResult = testCase.measure {
+        val payload = args.payloadOr(TestFixtures.initialPayload(mediaType))
+        val fileName = args.fileName ?: TestFixtures.fileName(mediaType)
+        val uri = api.createMedia(mediaType, volume, fileName, payload, args.relativePath)
+        if (uri != null) {
+            return@measure testCase.fail(
+                message = "createMedia unexpectedly succeeded",
+                metadata = mapOf(
+                    "uri" to uri.toString(),
+                    "fileName" to fileName,
+                    "relativePath" to args.relativePath.orEmpty(),
+                ),
+            )
+        }
+        testCase.pass(
+            message = "create denied as expected",
+            metadata = mapOf(
+                "fileName" to fileName,
+                "relativePath" to args.relativePath.orEmpty(),
             ),
         )
     }

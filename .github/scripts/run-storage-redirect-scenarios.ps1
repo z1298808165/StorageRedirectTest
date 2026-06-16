@@ -21,6 +21,7 @@ $Action = "me.fakerqu.test.storageredirection.TEST_CASE"
 $Config = "/data/adb/modules/storage.redirect.x/config/apps/$AppId.json"
 $GlobalConfig = "/data/adb/modules/storage.redirect.x/config/global.json"
 $LogPath = "/data/adb/modules/storage.redirect.x/logs/running.log"
+$FileMonitorLogPath = "/data/adb/modules/storage.redirect.x/logs/file_monitor.log"
 $ResultDir = "/sdcard/Android/data/$AppId/files/test_case_result"
 $InternalResultDir = "/data/data/$AppId/files/test_case_result"
 $RealRoot = "/storage/emulated/0"
@@ -67,6 +68,18 @@ $MountNsAllowRoot = "$RealRoot/Download/SrtMountNsAllow"
 $PrivateMountNsAllowRoot = "$PrivateRoot/Download/SrtMountNsAllow"
 $MountNsReadOnlyRoot = "$RealRoot/Download/SrtMountNsReadOnly"
 $PrivateMountNsReadOnlyRoot = "$PrivateRoot/Download/SrtMountNsReadOnly"
+$MountNsMapParent = "$RealRoot/Download/SrtMountNsMapParent"
+$MountNsMapRwRequest = "$RealRoot/Download/SrtMountNsMapRW"
+$MountNsMapRoRequest = "$RealRoot/Download/SrtMountNsMapRO"
+$MountNsMapRwTarget = "$MountNsMapParent/WritableTarget"
+$MountNsMapRoTarget = "$MountNsMapParent/LockedTarget"
+$MonitorBaseRoot = "$RealRoot/Download/SrtMonitor"
+$PrivateMonitorBaseRoot = "$PrivateRoot/Download/SrtMonitor"
+$MonitorMapRequest = "$RealRoot/Download/SrtMonitorMap"
+$MonitorMapTarget = "$RealRoot/Download/SrtMonitorMapped"
+$MonitorLockedRoot = "$RealRoot/Download/SrtMonitorLocked"
+$MonitorWritableRoot = "$RealRoot/Download/SrtMonitorLocked/Writable"
+$PrivateMonitorWritableRoot = "$PrivateRoot/Download/SrtMonitorLocked/Writable"
 
 $script:Summary = New-Object System.Collections.Generic.List[object]
 $script:Failures = New-Object System.Collections.Generic.List[string]
@@ -182,14 +195,14 @@ function Test-FuseDaemonScenarioSupport {
 function Get-ScenarioList {
     $requested = New-Object System.Collections.Generic.List[int]
     foreach ($scenario in $Scenarios) {
-        if ($scenario -lt 1 -or $scenario -gt 21) { throw "Invalid scenario: $scenario" }
+        if ($scenario -lt 1 -or $scenario -gt 27) { throw "Invalid scenario: $scenario" }
         $requested.Add($scenario) | Out-Null
     }
     if ($requested.Count -eq 0 -and -not [string]::IsNullOrWhiteSpace($env:SRT_SCENARIOS)) {
         foreach ($part in ($env:SRT_SCENARIOS -split "[,\s;]+")) {
             if ([string]::IsNullOrWhiteSpace($part)) { continue }
             $scenario = [int]$part
-            if ($scenario -lt 1 -or $scenario -gt 21) { throw "Invalid scenario: $scenario" }
+            if ($scenario -lt 1 -or $scenario -gt 27) { throw "Invalid scenario: $scenario" }
             $requested.Add($scenario) | Out-Null
         }
     }
@@ -204,7 +217,14 @@ function Get-ScenarioList {
     } else {
         Write-Host "skip fuse daemon scenarios: module does not expose fuse_daemon_redirect_enabled or RUN_FUSE_DAEMON_SCENARIOS disabled"
     }
-    20..21 | ForEach-Object { $defaultScenarios.Add($_) | Out-Null }
+    20..22 | ForEach-Object { $defaultScenarios.Add($_) | Out-Null }
+    23..24 | ForEach-Object { $defaultScenarios.Add($_) | Out-Null }
+    if (Test-FuseDaemonScenarioSupport) {
+        25..27 | ForEach-Object { $defaultScenarios.Add($_) | Out-Null }
+    } else {
+        $defaultScenarios.Add(26) | Out-Null
+        Write-Host "skip file monitor fuse daemon scenarios: module does not expose fuse_daemon_redirect_enabled or RUN_FUSE_DAEMON_SCENARIOS disabled"
+    }
     @($defaultScenarios)
 }
 
@@ -250,6 +270,30 @@ function Apply-ScenarioConfig {
         21 {
             Use-MountNamespaceFallbackConfig
             Write-DeviceConfig '{"users":{"0":{"enabled":true,"read_only_paths":["Download/SrtMountNsReadOnly/Team*/Deep"]}}}'
+        }
+        22 {
+            Use-MountNamespaceFallbackConfig
+            Write-DeviceConfig '{"users":{"0":{"enabled":true,"read_only_paths":["Download/SrtMountNsMapParent","!Download/SrtMountNsMapParent/WritableTarget"],"path_mappings":{"Download/SrtMountNsMapRW":"Download/SrtMountNsMapParent/WritableTarget","Download/SrtMountNsMapRO":"Download/SrtMountNsMapParent/LockedTarget"}}}}'
+        }
+        23 {
+            Write-GlobalConfig (Get-TestGlobalConfig -FuseDaemonEnabled $false -FileMonitorEnabled $true)
+            Write-DeviceConfig '{"users":{"0":{"enabled":false}}}'
+        }
+        24 {
+            Write-GlobalConfig (Get-TestGlobalConfig -FuseDaemonEnabled $false -FileMonitorEnabled $true)
+            Write-DeviceConfig '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtMonitor"],"read_only_paths":["Download/SrtMonitorLocked","!Download/SrtMonitorLocked/Writable"],"path_mappings":{"Download/SrtMonitorMap":"Download/SrtMonitorMapped"}}}}'
+        }
+        25 {
+            Write-GlobalConfig (Get-TestGlobalConfig -FuseDaemonEnabled $true -FileMonitorEnabled $true)
+            Write-DeviceConfig '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtMonitor"],"read_only_paths":["Download/SrtMonitorLocked","!Download/SrtMonitorLocked/Writable"],"path_mappings":{"Download/SrtMonitorMap":"Download/SrtMonitorMapped"}}}}'
+        }
+        26 {
+            Write-GlobalConfig (Get-TestGlobalConfig -FuseDaemonEnabled $false -FileMonitorEnabled $true)
+            Write-DeviceConfig '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtMonitor"],"read_only_paths":["Download/SrtMonitorLocked","!Download/SrtMonitorLocked/Writable"],"path_mappings":{"Download/SrtMonitorMap":"Download/SrtMonitorMapped"}}}}'
+        }
+        27 {
+            Write-GlobalConfig (Get-TestGlobalConfig -FuseDaemonEnabled $true -FileMonitorEnabled $true)
+            Write-DeviceConfig '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtMonitor"],"read_only_paths":["Download/SrtMonitorLocked","!Download/SrtMonitorLocked/Writable"],"path_mappings":{"Download/SrtMonitorMap":"Download/SrtMonitorMapped"}}}}'
         }
         default { throw "Unknown scenario $Scenario" }
     }
@@ -493,13 +537,15 @@ function Clear-Targets {
     Invoke-Su "rm -rf '$BackendRoot/Download/SrtProbe' '$BackendRoot/Download/SrtOther' '$BackendRoot/Download/SrtOtherMapped' '$BackendRoot/Download/SrtMapOnlyMapped' '$BackendRoot/Download/SrtReadOnly' '$BackendRoot/Download/SrtMapRO' '$BackendRoot/Download/SrtAllow' '$BackendRoot/Download/SrtLegacy' '$BackendRoot/Download/SrtQMark' '$BackendRoot/Download/SrtLongest' '$BackendRoot/Download/SrtLongestBase' '$BackendRoot/Download/SrtLongestDeep' '$BackendRoot/Download/SrtPriority' '$BackendRoot/Download/SrtPriorityMapped' '$BackendRoot/Pictures/SrtLocked' '$BackendPrivateRoot/Download/SrtProbe' '$BackendPrivateRoot/Download/SrtOther' '$BackendPrivateRoot/Download/SrtOtherMapped' '$BackendPrivateRoot/Download/SrtMapOnlyMapped' '$BackendPrivateRoot/Download/SrtReadOnly' '$BackendPrivateRoot/Download/SrtMapRO' '$BackendPrivateRoot/Download/SrtAllow' '$BackendPrivateRoot/Download/SrtLegacy' '$BackendPrivateRoot/Download/SrtQMark' '$BackendPrivateRoot/Download/SrtLongest' '$BackendPrivateRoot/Download/SrtLongestBase' '$BackendPrivateRoot/Download/SrtLongestDeep' '$BackendPrivateRoot/Download/SrtPriority' '$BackendPrivateRoot/Download/SrtPriorityMapped' '$BackendPrivateRoot/Pictures/SrtLocked'; rm -f '$BackendRoot/Download/$AllowPartFile' '$BackendPrivateRoot/Download/$AllowPartFile' '$BackendRoot/Download/$QMarkSingleFile' '$BackendPrivateRoot/Download/$QMarkSingleFile' '$BackendRoot/Download/$QMarkDoubleFile' '$BackendPrivateRoot/Download/$QMarkDoubleFile' '$BackendRoot/Download/Test/$TestFile' '$BackendPrivateRoot/Download/Test/$TestFile' '$BackendRoot/.xldownload/$TestFile' '$BackendRoot/.xlDownload/$TestFile' '$BackendPrivateRoot/.xldownload/$TestFile' '$BackendPrivateRoot/.xlDownload/$TestFile'" | Out-Null
     Invoke-Su "mkdir -p '$BackendRoot/Download/SrtProbe' '$BackendRoot/Download/Test' '$BackendRoot/Download/SrtMapOnlyMapped' '$BackendRoot/Download/SrtReadOnly' '$BackendRoot/Download/SrtMapRO' '$BackendRoot/Download/SrtAllow/tmp' '$BackendRoot/Download/SrtLegacy/tmp' '$BackendRoot/Download/SrtQMark/Keep1' '$BackendRoot/Download/SrtQMark/Keep12' '$BackendRoot/Download/SrtLongest/Deep' '$BackendRoot/Download/SrtLongestBase' '$BackendRoot/Download/SrtLongestDeep' '$BackendRoot/Download/SrtPriority' '$BackendRoot/Download/SrtPriorityMapped' '$BackendRoot/Pictures/SrtLocked' '$BackendRoot/.xldownload' '$BackendRoot/.xlDownload' '$BackendPrivateRoot/Download/SrtProbe' '$BackendPrivateRoot/Download/Test' '$BackendPrivateRoot/Download/SrtMapOnlyMapped' '$BackendPrivateRoot/Download/SrtReadOnly' '$BackendPrivateRoot/Download/SrtMapRO' '$BackendPrivateRoot/Download/SrtAllow/tmp' '$BackendPrivateRoot/Download/SrtLegacy/tmp' '$BackendPrivateRoot/Download/SrtQMark/Keep1' '$BackendPrivateRoot/Download/SrtQMark/Keep12' '$BackendPrivateRoot/Download/SrtLongest/Deep' '$BackendPrivateRoot/Download/SrtLongestBase' '$BackendPrivateRoot/Download/SrtLongestDeep' '$BackendPrivateRoot/Download/SrtPriority' '$BackendPrivateRoot/Download/SrtPriorityMapped' '$BackendPrivateRoot/Pictures/SrtLocked' '$BackendPrivateRoot/.xldownload' '$BackendPrivateRoot/.xlDownload'; chmod -R 777 '$BackendRoot/Download/SrtProbe' '$BackendRoot/Download/Test' '$BackendRoot/Download/SrtMapOnlyMapped' '$BackendRoot/Download/SrtReadOnly' '$BackendRoot/Download/SrtMapRO' '$BackendRoot/Download/SrtAllow' '$BackendRoot/Download/SrtLegacy' '$BackendRoot/Download/SrtQMark' '$BackendRoot/Download/SrtLongest' '$BackendRoot/Download/SrtLongestBase' '$BackendRoot/Download/SrtLongestDeep' '$BackendRoot/Download/SrtPriority' '$BackendRoot/Download/SrtPriorityMapped' '$BackendRoot/Pictures/SrtLocked' '$BackendPrivateRoot/Download/SrtProbe' '$BackendPrivateRoot/Download/Test' '$BackendPrivateRoot/Download/SrtMapOnlyMapped' '$BackendPrivateRoot/Download/SrtReadOnly' '$BackendPrivateRoot/Download/SrtMapRO' '$BackendPrivateRoot/Download/SrtAllow' '$BackendPrivateRoot/Download/SrtLegacy' '$BackendPrivateRoot/Download/SrtQMark' '$BackendPrivateRoot/Download/SrtLongest' '$BackendPrivateRoot/Download/SrtLongestBase' '$BackendPrivateRoot/Download/SrtLongestDeep' '$BackendPrivateRoot/Download/SrtPriority' '$BackendPrivateRoot/Download/SrtPriorityMapped' '$BackendPrivateRoot/Pictures/SrtLocked' 2>/dev/null || true; chmod 777 '$BackendRoot/.xldownload' '$BackendRoot/.xlDownload' '$BackendPrivateRoot/.xldownload' '$BackendPrivateRoot/.xlDownload' 2>/dev/null || true" | Out-Null
     Invoke-Su "rm -rf '$BackendRoot/Download/SrtFusePlain' '$BackendRoot/Download/SrtFuseExclude' '$BackendRoot/Download/SrtFuseMapParent' '$BackendRoot/Download/SrtFuseMapRW' '$BackendRoot/Download/SrtFuseMapRO' '$BackendRoot/Download/SrtFuseMulti' '$BackendRoot/DCIM/SrtFuseQQ' '$BackendRoot/DCIM/SrtFuseOther' '$BackendPrivateRoot/Download/SrtFusePlain' '$BackendPrivateRoot/Download/SrtFuseExclude' '$BackendPrivateRoot/Download/SrtFuseMapParent' '$BackendPrivateRoot/Download/SrtFuseMapRW' '$BackendPrivateRoot/Download/SrtFuseMapRO' '$BackendPrivateRoot/Download/SrtFuseMulti' '$BackendPrivateRoot/DCIM/SrtFuseQQ' '$BackendPrivateRoot/DCIM/SrtFuseOther'; mkdir -p '$BackendRoot/Download/SrtFusePlain' '$BackendRoot/Download/SrtFuseExclude/Locked' '$BackendRoot/Download/SrtFuseExclude/Writable' '$BackendRoot/Download/SrtFuseMapParent/WritableTarget' '$BackendRoot/Download/SrtFuseMapParent/LockedTarget' '$BackendRoot/Download/SrtFuseMapRW' '$BackendRoot/Download/SrtFuseMapRO' '$BackendRoot/Download/SrtFuseMulti/QQ' '$BackendRoot/Download/SrtFuseMulti/WeChat' '$BackendRoot/Download/SrtFuseMulti/Locked' '$BackendRoot/Download/SrtFuseMulti/Other' '$BackendRoot/DCIM/SrtFuseQQ' '$BackendRoot/DCIM/SrtFuseOther' '$BackendPrivateRoot/Download/SrtFusePlain' '$BackendPrivateRoot/Download/SrtFuseExclude/Locked' '$BackendPrivateRoot/Download/SrtFuseExclude/Writable' '$BackendPrivateRoot/Download/SrtFuseMapParent/WritableTarget' '$BackendPrivateRoot/Download/SrtFuseMapParent/LockedTarget' '$BackendPrivateRoot/Download/SrtFuseMapRW' '$BackendPrivateRoot/Download/SrtFuseMapRO' '$BackendPrivateRoot/Download/SrtFuseMulti/QQ' '$BackendPrivateRoot/Download/SrtFuseMulti/WeChat' '$BackendPrivateRoot/Download/SrtFuseMulti/Locked' '$BackendPrivateRoot/Download/SrtFuseMulti/Other' '$BackendPrivateRoot/DCIM/SrtFuseQQ' '$BackendPrivateRoot/DCIM/SrtFuseOther'; chmod -R 777 '$BackendRoot/Download/SrtFusePlain' '$BackendRoot/Download/SrtFuseExclude' '$BackendRoot/Download/SrtFuseMapParent' '$BackendRoot/Download/SrtFuseMapRW' '$BackendRoot/Download/SrtFuseMapRO' '$BackendRoot/Download/SrtFuseMulti' '$BackendRoot/DCIM/SrtFuseQQ' '$BackendRoot/DCIM/SrtFuseOther' '$BackendPrivateRoot/Download/SrtFusePlain' '$BackendPrivateRoot/Download/SrtFuseExclude' '$BackendPrivateRoot/Download/SrtFuseMapParent' '$BackendPrivateRoot/Download/SrtFuseMapRW' '$BackendPrivateRoot/Download/SrtFuseMapRO' '$BackendPrivateRoot/Download/SrtFuseMulti' '$BackendPrivateRoot/DCIM/SrtFuseQQ' '$BackendPrivateRoot/DCIM/SrtFuseOther' 2>/dev/null || true" | Out-Null
-    Invoke-Su "rm -rf '$BackendRoot/Download/SrtMountNsAllow' '$BackendRoot/Download/SrtMountNsReadOnly' '$BackendPrivateRoot/Download/SrtMountNsAllow' '$BackendPrivateRoot/Download/SrtMountNsReadOnly'; mkdir -p '$BackendRoot/Download/SrtMountNsAllow' '$BackendRoot/Download/SrtMountNsReadOnly' '$BackendPrivateRoot/Download/SrtMountNsAllow' '$BackendPrivateRoot/Download/SrtMountNsReadOnly'; chmod -R 777 '$BackendRoot/Download/SrtMountNsAllow' '$BackendRoot/Download/SrtMountNsReadOnly' '$BackendPrivateRoot/Download/SrtMountNsAllow' '$BackendPrivateRoot/Download/SrtMountNsReadOnly' 2>/dev/null || true" | Out-Null
+    Invoke-Su "rm -rf '$BackendRoot/Download/SrtMountNsAllow' '$BackendRoot/Download/SrtMountNsReadOnly' '$BackendRoot/Download/SrtMountNsMapParent' '$BackendRoot/Download/SrtMountNsMapRW' '$BackendRoot/Download/SrtMountNsMapRO' '$BackendPrivateRoot/Download/SrtMountNsAllow' '$BackendPrivateRoot/Download/SrtMountNsReadOnly' '$BackendPrivateRoot/Download/SrtMountNsMapParent' '$BackendPrivateRoot/Download/SrtMountNsMapRW' '$BackendPrivateRoot/Download/SrtMountNsMapRO'; mkdir -p '$BackendRoot/Download/SrtMountNsAllow' '$BackendRoot/Download/SrtMountNsReadOnly' '$BackendRoot/Download/SrtMountNsMapParent/WritableTarget' '$BackendRoot/Download/SrtMountNsMapParent/LockedTarget' '$BackendRoot/Download/SrtMountNsMapRW' '$BackendRoot/Download/SrtMountNsMapRO' '$BackendPrivateRoot/Download/SrtMountNsAllow' '$BackendPrivateRoot/Download/SrtMountNsReadOnly' '$BackendPrivateRoot/Download/SrtMountNsMapParent/WritableTarget' '$BackendPrivateRoot/Download/SrtMountNsMapParent/LockedTarget' '$BackendPrivateRoot/Download/SrtMountNsMapRW' '$BackendPrivateRoot/Download/SrtMountNsMapRO'; chmod -R 777 '$BackendRoot/Download/SrtMountNsAllow' '$BackendRoot/Download/SrtMountNsReadOnly' '$BackendRoot/Download/SrtMountNsMapParent' '$BackendRoot/Download/SrtMountNsMapRW' '$BackendRoot/Download/SrtMountNsMapRO' '$BackendPrivateRoot/Download/SrtMountNsAllow' '$BackendPrivateRoot/Download/SrtMountNsReadOnly' '$BackendPrivateRoot/Download/SrtMountNsMapParent' '$BackendPrivateRoot/Download/SrtMountNsMapRW' '$BackendPrivateRoot/Download/SrtMountNsMapRO' 2>/dev/null || true" | Out-Null
+    Invoke-Su "rm -rf '$BackendRoot/Download/SrtMonitor' '$BackendRoot/Download/SrtMonitorMap' '$BackendRoot/Download/SrtMonitorMapped' '$BackendRoot/Download/SrtMonitorLocked' '$BackendPrivateRoot/Download/SrtMonitor' '$BackendPrivateRoot/Download/SrtMonitorMap' '$BackendPrivateRoot/Download/SrtMonitorMapped' '$BackendPrivateRoot/Download/SrtMonitorLocked'; mkdir -p '$BackendRoot/Download/SrtMonitor' '$BackendRoot/Download/SrtMonitorMap' '$BackendRoot/Download/SrtMonitorMapped' '$BackendRoot/Download/SrtMonitorLocked/Writable' '$BackendPrivateRoot/Download/SrtMonitor' '$BackendPrivateRoot/Download/SrtMonitorMap' '$BackendPrivateRoot/Download/SrtMonitorMapped' '$BackendPrivateRoot/Download/SrtMonitorLocked/Writable'; chmod -R 777 '$BackendRoot/Download/SrtMonitor' '$BackendRoot/Download/SrtMonitorMap' '$BackendRoot/Download/SrtMonitorMapped' '$BackendRoot/Download/SrtMonitorLocked' '$BackendPrivateRoot/Download/SrtMonitor' '$BackendPrivateRoot/Download/SrtMonitorMap' '$BackendPrivateRoot/Download/SrtMonitorMapped' '$BackendPrivateRoot/Download/SrtMonitorLocked' 2>/dev/null || true" | Out-Null
 }
 
 function Remove-TestTargetArtifacts {
     Invoke-Su "rm -rf '$BackendRoot/Download/SrtProbe' '$BackendRoot/Download/SrtOther' '$BackendRoot/Download/SrtOtherMapped' '$BackendRoot/Download/SrtMapOnlyMapped' '$BackendRoot/Download/SrtReadOnly' '$BackendRoot/Download/SrtMapRO' '$BackendRoot/Download/SrtAllow' '$BackendRoot/Download/SrtLegacy' '$BackendRoot/Download/SrtQMark' '$BackendRoot/Download/SrtLongest' '$BackendRoot/Download/SrtLongestBase' '$BackendRoot/Download/SrtLongestDeep' '$BackendRoot/Download/SrtPriority' '$BackendRoot/Download/SrtPriorityMapped' '$BackendRoot/Download/Test' '$BackendRoot/.xldownload' '$BackendRoot/.xlDownload' '$BackendRoot/Pictures/SrtLocked' '$BackendPrivateRoot/Download/SrtProbe' '$BackendPrivateRoot/Download/SrtOther' '$BackendPrivateRoot/Download/SrtOtherMapped' '$BackendPrivateRoot/Download/SrtMapOnlyMapped' '$BackendPrivateRoot/Download/SrtReadOnly' '$BackendPrivateRoot/Download/SrtMapRO' '$BackendPrivateRoot/Download/SrtAllow' '$BackendPrivateRoot/Download/SrtLegacy' '$BackendPrivateRoot/Download/SrtQMark' '$BackendPrivateRoot/Download/SrtLongest' '$BackendPrivateRoot/Download/SrtLongestBase' '$BackendPrivateRoot/Download/SrtLongestDeep' '$BackendPrivateRoot/Download/SrtPriority' '$BackendPrivateRoot/Download/SrtPriorityMapped' '$BackendPrivateRoot/Download/Test' '$BackendPrivateRoot/.xldownload' '$BackendPrivateRoot/.xlDownload' '$BackendPrivateRoot/Pictures/SrtLocked'; rm -f '$BackendRoot/Download/$AllowPartFile' '$BackendPrivateRoot/Download/$AllowPartFile' '$BackendRoot/Download/$QMarkSingleFile' '$BackendPrivateRoot/Download/$QMarkSingleFile' '$BackendRoot/Download/$QMarkDoubleFile' '$BackendPrivateRoot/Download/$QMarkDoubleFile'" | Out-Null
     Invoke-Su "rm -rf '$BackendRoot/Download/SrtFusePlain' '$BackendRoot/Download/SrtFuseExclude' '$BackendRoot/Download/SrtFuseMapParent' '$BackendRoot/Download/SrtFuseMapRW' '$BackendRoot/Download/SrtFuseMapRO' '$BackendRoot/Download/SrtFuseMulti' '$BackendRoot/DCIM/SrtFuseQQ' '$BackendRoot/DCIM/SrtFuseOther' '$BackendPrivateRoot/Download/SrtFusePlain' '$BackendPrivateRoot/Download/SrtFuseExclude' '$BackendPrivateRoot/Download/SrtFuseMapParent' '$BackendPrivateRoot/Download/SrtFuseMapRW' '$BackendPrivateRoot/Download/SrtFuseMapRO' '$BackendPrivateRoot/Download/SrtFuseMulti' '$BackendPrivateRoot/DCIM/SrtFuseQQ' '$BackendPrivateRoot/DCIM/SrtFuseOther'" | Out-Null
-    Invoke-Su "rm -rf '$BackendRoot/Download/SrtMountNsAllow' '$BackendRoot/Download/SrtMountNsReadOnly' '$BackendPrivateRoot/Download/SrtMountNsAllow' '$BackendPrivateRoot/Download/SrtMountNsReadOnly'" | Out-Null
+    Invoke-Su "rm -rf '$BackendRoot/Download/SrtMountNsAllow' '$BackendRoot/Download/SrtMountNsReadOnly' '$BackendRoot/Download/SrtMountNsMapParent' '$BackendRoot/Download/SrtMountNsMapRW' '$BackendRoot/Download/SrtMountNsMapRO' '$BackendPrivateRoot/Download/SrtMountNsAllow' '$BackendPrivateRoot/Download/SrtMountNsReadOnly' '$BackendPrivateRoot/Download/SrtMountNsMapParent' '$BackendPrivateRoot/Download/SrtMountNsMapRW' '$BackendPrivateRoot/Download/SrtMountNsMapRO'" | Out-Null
+    Invoke-Su "rm -rf '$BackendRoot/Download/SrtMonitor' '$BackendRoot/Download/SrtMonitorMap' '$BackendRoot/Download/SrtMonitorMapped' '$BackendRoot/Download/SrtMonitorLocked' '$BackendPrivateRoot/Download/SrtMonitor' '$BackendPrivateRoot/Download/SrtMonitorMap' '$BackendPrivateRoot/Download/SrtMonitorMapped' '$BackendPrivateRoot/Download/SrtMonitorLocked'" | Out-Null
 }
 
 function Remove-MediaStoreRowsByPattern {
@@ -542,6 +588,7 @@ function Remove-RandomMediaStoreRows {
     Remove-MediaStoreRowsByPattern "content://media/external/audio/media" @("_display_name=srt_audio_\d+\.mp3(,|$)") @("relative_path=Music/", "_data=.*/Music/", "_data=.*/Android/data/$escapedAppId/sdcard/Music/")
     Remove-MediaStoreRowsByPattern "content://media/external/file" @("_display_name=srt_file_\d+\.txt(,|$)") @("relative_path=Documents/", "_data=.*/Documents/", "_data=.*/Android/data/$escapedAppId/sdcard/Documents/")
     Remove-MediaStoreRowsByPattern "content://media/external/downloads" @("_display_name=srt_download_\d+\.bin(,|$)", "_display_name=srt_ci_probe\.part(,|$)", "_display_name=srt_qmark_a\.txt(,|$)", "_display_name=srt_qmark_ab\.txt(,|$)") @("relative_path=Download/", "_data=.*/Download/", "_data=.*/Android/data/$escapedAppId/sdcard/Download/")
+    Remove-MediaStoreRowsByPattern "content://media/external/downloads" @("_display_name=srt_monitor_[A-Za-z0-9_.-]+\.bin(,|$)") @("relative_path=Download/SrtMonitor", "relative_path=Download/SrtMonitorMap", "relative_path=Download/SrtMonitorMapped", "relative_path=Download/SrtMonitorLocked", "_data=.*/Download/SrtMonitor", "_data=.*/Android/data/$escapedAppId/sdcard/Download/SrtMonitor")
 }
 
 function Remove-RandomPhysicalMediaFiles {
@@ -550,6 +597,7 @@ function Remove-RandomPhysicalMediaFiles {
     Invoke-Su "find '$BackendRoot/Music' '$BackendPrivateRoot/Music' -maxdepth 1 -type f -name 'srt_audio_[0-9]*.mp3' -delete 2>/dev/null || true" | Out-Null
     Invoke-Su "find '$BackendRoot/Documents' '$BackendPrivateRoot/Documents' -maxdepth 1 -type f -name 'srt_file_[0-9]*.txt' -delete 2>/dev/null || true" | Out-Null
     Invoke-Su "find '$BackendRoot/Download' '$BackendPrivateRoot/Download' -maxdepth 1 -type f -name 'srt_download_[0-9]*.bin' -delete 2>/dev/null || true" | Out-Null
+    Invoke-Su "find '$BackendRoot/Download/SrtMonitor' '$BackendRoot/Download/SrtMonitorMap' '$BackendRoot/Download/SrtMonitorMapped' '$BackendRoot/Download/SrtMonitorLocked' '$BackendPrivateRoot/Download/SrtMonitor' '$BackendPrivateRoot/Download/SrtMonitorMap' '$BackendPrivateRoot/Download/SrtMonitorMapped' '$BackendPrivateRoot/Download/SrtMonitorLocked' -type f -name 'srt_monitor_*.bin' -delete 2>/dev/null || true" | Out-Null
     Invoke-Su "rm -rf '$BackendRoot/Android/data/$AppId/files/test_case_result' '$BackendRoot/Android/data/$AppId/files/srt_file_tests' '$InternalResultDir' '/data/data/$AppId/files/srt_file_tests' '$SandboxResultDir' '$BackendPrivateRoot/Android/data/$AppId/files/srt_file_tests' 2>/dev/null || true" | Out-Null
 }
 
@@ -558,6 +606,140 @@ function Restart-MediaProvider {
     Invoke-Adb @("shell", "am", "force-stop", "com.google.android.providers.media.module") | Out-Null
     Invoke-Su "pkill -f com.android.providers.media.module 2>/dev/null || true; pkill -f com.google.android.providers.media.module 2>/dev/null || true" | Out-Null
     Start-Sleep -Seconds 2
+}
+
+function Ensure-MonitorCollector {
+    Invoke-Su "touch /data/adb/modules/storage.redirect.x/config/apps '$GlobalConfig' '$Config' 2>/dev/null || true" | Out-Null
+    Invoke-Su "/data/adb/modules/storage.redirect.x/bin/srxctl ensure-collectors" | Out-Null
+}
+
+function Clear-FileMonitorLog {
+    Invoke-Su "mkdir -p /data/adb/modules/storage.redirect.x/logs; : > '$FileMonitorLogPath'" | Out-Null
+}
+
+function Prepare-FileMonitorAssertion {
+    param([string]$Scenario, [string]$Label)
+    Write-Host "  - monitor prepare $Scenario/$Label"
+    Invoke-Adb @("logcat", "-c") | Out-Null
+    Clear-FileMonitorLog
+    Ensure-MonitorCollector
+    if ($script:ServiceCaseSettleMilliseconds -gt 0) {
+        Start-Sleep -Milliseconds $script:ServiceCaseSettleMilliseconds
+    }
+}
+
+function Wait-FileMonitorLogLine {
+    param(
+        [string]$Scenario,
+        [string]$Label,
+        [string]$FileName,
+        [ValidateSet("success", "failure")]
+        [string]$Expected,
+        [int]$TimeoutSeconds = 30
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $lines = @(
+            Invoke-Su "grep -F -- '$AppId' '$FileMonitorLogPath' 2>/dev/null | grep -F -- '$FileName' 2>/dev/null || true"
+        )
+        foreach ($line in $lines) {
+            if ($Expected -eq "success" -and $line -notmatch "ret=-1" -and $line -notmatch "op=close_write") {
+                Write-Host "  - monitor_log_found $Scenario/$Label file=$FileName expected=$Expected"
+                return $true
+            }
+            if ($Expected -eq "failure" -and $line -match "ret=-1" -and $line -match "deny_reason=read_only_rule") {
+                Write-Host "  - monitor_log_found $Scenario/$Label file=$FileName expected=$Expected"
+                return $true
+            }
+        }
+        Start-Sleep -Milliseconds 200
+    }
+    Write-Warning "monitor log timeout $Scenario/$Label file=$FileName expected=$Expected"
+    @(
+        Invoke-Su "tail -80 '$FileMonitorLogPath' 2>/dev/null || true"
+    ) | ForEach-Object { Write-Host "  monitor_tail: $_" }
+    return $false
+}
+
+function New-MonitorFileName {
+    param([string]$Scenario, [string]$Label)
+    "srt_monitor_${Scenario}_${Label}.bin" -replace '[^A-Za-z0-9_.-]', '_'
+}
+
+function Invoke-FileMonitorWriteSuccessCase {
+    param([string]$Scenario, [string]$Label, [string]$Path, [string]$ExpectedPath, [string]$PrivatePath = "")
+    $fileName = ($Path -split '/')[-1]
+    Prepare-FileMonitorAssertion $Scenario $Label
+    $ok = (Invoke-WriteCase ([int]$Scenario) $Label $Path $Payload).Ok
+    $ok = (Require-File "scenario-$Scenario" "$Label expected" $ExpectedPath) -and $ok
+    if ($PrivatePath) {
+        $ok = (Require-Missing "scenario-$Scenario" "$Label private" $PrivatePath) -and $ok
+    }
+    $ok = (Wait-FileMonitorLogLine $Scenario $Label $fileName "success") -and $ok
+    $ok
+}
+
+function Invoke-FileMonitorWriteDeniedCase {
+    param([string]$Scenario, [string]$Label, [string]$Path, [string]$MissingPath = "")
+    $fileName = ($Path -split '/')[-1]
+    if (-not $MissingPath) { $MissingPath = $Path }
+    Prepare-FileMonitorAssertion $Scenario $Label
+    $ok = (Invoke-ServiceCase "scenario-$Scenario" $Label "file_write_denied" @{ file_path = $Path; payload = $Payload } "^PASS \[file_write_denied\]").Ok
+    $ok = (Require-Missing "scenario-$Scenario" "$Label missing" $MissingPath) -and $ok
+    $ok = (Wait-FileMonitorLogLine $Scenario $Label $fileName "failure") -and $ok
+    $ok
+}
+
+function Invoke-FileMonitorMediaStoreSuccessCase {
+    param([string]$Scenario, [string]$Label, [string]$RelativePath, [string]$ExpectedPath, [string]$PrivatePath = "")
+    $fileName = New-MonitorFileName $Scenario $Label
+    Prepare-FileMonitorAssertion $Scenario $Label
+    $ok = (Invoke-MediaStoreDownloadCreateCase ([int]$Scenario) $Label $fileName $RelativePath).Ok
+    $ok = (Require-File "scenario-$Scenario" "$Label expected" "$ExpectedPath/$fileName") -and $ok
+    if ($PrivatePath) {
+        $ok = (Require-Missing "scenario-$Scenario" "$Label private" "$PrivatePath/$fileName") -and $ok
+    }
+    $ok = (Wait-FileMonitorLogLine $Scenario $Label $fileName "success") -and $ok
+    $ok
+}
+
+function Invoke-FileMonitorMediaStoreDeniedCase {
+    param([string]$Scenario, [string]$Label, [string]$RelativePath, [string]$MissingPath)
+    $fileName = New-MonitorFileName $Scenario $Label
+    Prepare-FileMonitorAssertion $Scenario $Label
+    $ok = (Invoke-MediaStoreDownloadCreateDeniedCase ([int]$Scenario) $Label $fileName $RelativePath).Ok
+    $ok = (Require-Missing "scenario-$Scenario" "$Label missing" "$MissingPath/$fileName") -and $ok
+    $ok = (Wait-FileMonitorLogLine $Scenario $Label $fileName "failure") -and $ok
+    $ok
+}
+
+function Invoke-DisabledRedirectMonitorScenario {
+    param([string]$Scenario)
+    $fileName = "srt_monitor_${Scenario}_disabled_regular.bin"
+    Invoke-FileMonitorWriteSuccessCase $Scenario "disabled-regular-write" "$MonitorBaseRoot/$fileName" "$MonitorBaseRoot/$fileName" "$PrivateMonitorBaseRoot/$fileName"
+}
+
+function Invoke-RegularMonitorScenario {
+    param([string]$Scenario)
+    $allowFile = "srt_monitor_${Scenario}_allow.bin"
+    $mapFile = "srt_monitor_${Scenario}_map.bin"
+    $lockedFile = "srt_monitor_${Scenario}_locked.bin"
+    $writableFile = "srt_monitor_${Scenario}_writable.bin"
+    $ok = (Invoke-FileMonitorWriteSuccessCase $Scenario "regular-allow-write" "$MonitorBaseRoot/$allowFile" "$MonitorBaseRoot/$allowFile" "$PrivateMonitorBaseRoot/$allowFile")
+    $ok = (Invoke-FileMonitorWriteSuccessCase $Scenario "regular-mapped-write" "$MonitorMapRequest/$mapFile" "$MonitorMapTarget/$mapFile") -and $ok
+    $ok = (Invoke-FileMonitorWriteDeniedCase $Scenario "regular-read-only-denied" "$MonitorLockedRoot/$lockedFile") -and $ok
+    $ok = (Invoke-FileMonitorWriteSuccessCase $Scenario "regular-read-only-excluded-write" "$MonitorWritableRoot/$writableFile" "$MonitorWritableRoot/$writableFile" "$PrivateMonitorWritableRoot/$writableFile") -and $ok
+    $ok
+}
+
+function Invoke-MediaStoreMonitorScenario {
+    param([string]$Scenario)
+    $ok = (Invoke-FileMonitorMediaStoreSuccessCase $Scenario "media-allow-create" "Download/SrtMonitor" $MonitorBaseRoot $PrivateMonitorBaseRoot)
+    $ok = (Invoke-FileMonitorMediaStoreSuccessCase $Scenario "media-mapped-create" "Download/SrtMonitorMap" $MonitorMapTarget) -and $ok
+    $ok = (Invoke-FileMonitorMediaStoreDeniedCase $Scenario "media-read-only-denied" "Download/SrtMonitorLocked" $MonitorLockedRoot) -and $ok
+    $ok = (Invoke-FileMonitorMediaStoreSuccessCase $Scenario "media-read-only-excluded-create" "Download/SrtMonitorLocked/Writable" $MonitorWritableRoot $PrivateMonitorWritableRoot) -and $ok
+    $ok
 }
 
 function Invoke-TestArtifactCleanup {
@@ -643,6 +825,12 @@ function Get-ScenarioTitle {
         19 { "Fuse daemon sibling wildcard rules stay scoped" }
         20 { "mount namespace allowed wildcard fallback" }
         21 { "mount namespace read_only wildcard fallback" }
+        22 { "mount namespace mapped final target read-only policy" }
+        23 { "file monitor disabled redirect regular app success record" }
+        24 { "file monitor regular app with fuse daemon off" }
+        25 { "file monitor regular app with fuse daemon on" }
+        26 { "file monitor system writer with fuse daemon off" }
+        27 { "file monitor system writer with fuse daemon on" }
     }
 }
 
@@ -657,8 +845,17 @@ function Invoke-CreateCase {
 }
 
 function Invoke-MediaStoreDownloadCreateCase {
-    param([int]$Scenario, [string]$Label, [string]$FileName)
-    Invoke-ServiceCase "scenario-$Scenario" $Label "mediastore_create_download" @{ file_name = $FileName } "^PASS \[mediastore_create_download\]"
+    param([int]$Scenario, [string]$Label, [string]$FileName, [string]$RelativePath = "")
+    $extras = @{ file_name = $FileName }
+    if ($RelativePath) { $extras.relative_path = $RelativePath }
+    Invoke-ServiceCase "scenario-$Scenario" $Label "mediastore_create_download" $extras "^PASS \[mediastore_create_download\]"
+}
+
+function Invoke-MediaStoreDownloadCreateDeniedCase {
+    param([int]$Scenario, [string]$Label, [string]$FileName, [string]$RelativePath = "")
+    $extras = @{ file_name = $FileName }
+    if ($RelativePath) { $extras.relative_path = $RelativePath }
+    Invoke-ServiceCase "scenario-$Scenario" $Label "mediastore_create_download_denied" $extras "^PASS \[mediastore_create_download_denied\]"
 }
 
 function Expect-AppEntry {
@@ -858,6 +1055,22 @@ function Invoke-FuseDaemonMappingReadOnlyScenario {
     $ok
 }
 
+function Invoke-MountNamespaceMappingReadOnlyScenario {
+    param([int]$Scenario)
+    $rwRequest = "$MountNsMapRwRequest/$TestFile"
+    $rwTarget = "$MountNsMapRwTarget/$TestFile"
+    $roRequest = "$MountNsMapRoRequest/$TestFile"
+    $roTarget = "$MountNsMapRoTarget/$TestFile"
+
+    $ok = (Invoke-WriteCase $Scenario "mapping-target-excluded-write" $rwRequest $Payload).Ok
+    $ok = (Require-File "scenario-$Scenario" "mount-ns-mapping-rw-target" $rwTarget) -and $ok
+    $ok = (Require-Missing "scenario-$Scenario" "mount-ns-mapping-rw-request" $rwRequest) -and $ok
+    $ok = (Invoke-ServiceCase "scenario-$Scenario" "mapping-target-read-only-denied" "file_write_denied" @{ file_path = $roRequest; payload = $Payload } "^PASS \[file_write_denied\]").Ok -and $ok
+    $ok = (Require-Missing "scenario-$Scenario" "mount-ns-mapping-ro-target" $roTarget) -and $ok
+    $ok = (Require-Missing "scenario-$Scenario" "mount-ns-mapping-ro-request" $roRequest) -and $ok
+    $ok
+}
+
 function Invoke-FuseDaemonMultiWildcardScenario {
     param([int]$Scenario)
     $qqPath = "$FuseMultiRoot/QQ/$TestFile"
@@ -944,6 +1157,12 @@ function Invoke-Scenario {
         19 { Invoke-FuseDaemonMultiWildcardScenario $Scenario }
         20 { Invoke-MountNamespaceAllowWildcardFallbackScenario $Scenario }
         21 { Invoke-MountNamespaceReadOnlyWildcardFallbackScenario $Scenario }
+        22 { Invoke-MountNamespaceMappingReadOnlyScenario $Scenario }
+        23 { Invoke-DisabledRedirectMonitorScenario $Scenario }
+        24 { Invoke-RegularMonitorScenario $Scenario }
+        25 { Invoke-RegularMonitorScenario $Scenario }
+        26 { Invoke-MediaStoreMonitorScenario $Scenario }
+        27 { Invoke-MediaStoreMonitorScenario $Scenario }
         default { Invoke-StandardScenario $Scenario }
     }
     $newFailures = $script:Failures.Count - $before

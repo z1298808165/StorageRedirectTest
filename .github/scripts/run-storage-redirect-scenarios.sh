@@ -5,6 +5,7 @@ APP_ID="${APP_ID:-me.fakerqu.test.storageredirect}"
 CONFIG="/data/adb/modules/storage.redirect.x/config/apps/${APP_ID}.json"
 GLOBAL_CONFIG="/data/adb/modules/storage.redirect.x/config/global.json"
 LOG_PATH="/data/adb/modules/storage.redirect.x/logs/running.log"
+FILE_MONITOR_LOG_PATH="/data/adb/modules/storage.redirect.x/logs/file_monitor.log"
 ACTION="me.fakerqu.test.storageredirection.TEST_CASE"
 RESULT_DIR="/sdcard/Android/data/${APP_ID}/files/test_case_result"
 INTERNAL_RESULT_DIR="/data/data/${APP_ID}/files/test_case_result"
@@ -52,6 +53,18 @@ MOUNT_NS_ALLOW_ROOT="${REAL_ROOT}/Download/SrtMountNsAllow"
 PRIVATE_MOUNT_NS_ALLOW_ROOT="${PRIVATE_ROOT}/Download/SrtMountNsAllow"
 MOUNT_NS_READ_ONLY_ROOT="${REAL_ROOT}/Download/SrtMountNsReadOnly"
 PRIVATE_MOUNT_NS_READ_ONLY_ROOT="${PRIVATE_ROOT}/Download/SrtMountNsReadOnly"
+MOUNT_NS_MAP_PARENT="${REAL_ROOT}/Download/SrtMountNsMapParent"
+MOUNT_NS_MAP_RW_REQUEST="${REAL_ROOT}/Download/SrtMountNsMapRW"
+MOUNT_NS_MAP_RO_REQUEST="${REAL_ROOT}/Download/SrtMountNsMapRO"
+MOUNT_NS_MAP_RW_TARGET="${MOUNT_NS_MAP_PARENT}/WritableTarget"
+MOUNT_NS_MAP_RO_TARGET="${MOUNT_NS_MAP_PARENT}/LockedTarget"
+MONITOR_BASE_ROOT="${REAL_ROOT}/Download/SrtMonitor"
+PRIVATE_MONITOR_BASE_ROOT="${PRIVATE_ROOT}/Download/SrtMonitor"
+MONITOR_MAP_REQUEST="${REAL_ROOT}/Download/SrtMonitorMap"
+MONITOR_MAP_TARGET="${REAL_ROOT}/Download/SrtMonitorMapped"
+MONITOR_LOCKED_ROOT="${REAL_ROOT}/Download/SrtMonitorLocked"
+MONITOR_WRITABLE_ROOT="${REAL_ROOT}/Download/SrtMonitorLocked/Writable"
+PRIVATE_MONITOR_WRITABLE_ROOT="${PRIVATE_ROOT}/Download/SrtMonitorLocked/Writable"
 SRT_FRESH_APP_PER_CASE="${SRT_FRESH_APP_PER_CASE:-0}"
 SRT_RESULT_POLL_MS="${SRT_RESULT_POLL_MS:-150}"
 SRT_APP_LAUNCH_SETTLE_MS="${SRT_APP_LAUNCH_SETTLE_MS:-800}"
@@ -182,6 +195,30 @@ apply_config() {
       use_mount_namespace_fallback_config
       write_config '{"users":{"0":{"enabled":true,"read_only_paths":["Download/SrtMountNsReadOnly/Team*/Deep"]}}}'
       ;;
+    22)
+      use_mount_namespace_fallback_config
+      write_config '{"users":{"0":{"enabled":true,"read_only_paths":["Download/SrtMountNsMapParent","!Download/SrtMountNsMapParent/WritableTarget"],"path_mappings":{"Download/SrtMountNsMapRW":"Download/SrtMountNsMapParent/WritableTarget","Download/SrtMountNsMapRO":"Download/SrtMountNsMapParent/LockedTarget"}}}}'
+      ;;
+    23)
+      write_global_config "$(test_global_config false true)"
+      write_config '{"users":{"0":{"enabled":false}}}'
+      ;;
+    24)
+      write_global_config "$(test_global_config false true)"
+      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtMonitor"],"read_only_paths":["Download/SrtMonitorLocked","!Download/SrtMonitorLocked/Writable"],"path_mappings":{"Download/SrtMonitorMap":"Download/SrtMonitorMapped"}}}}'
+      ;;
+    25)
+      write_global_config "$(test_global_config true true)"
+      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtMonitor"],"read_only_paths":["Download/SrtMonitorLocked","!Download/SrtMonitorLocked/Writable"],"path_mappings":{"Download/SrtMonitorMap":"Download/SrtMonitorMapped"}}}}'
+      ;;
+    26)
+      write_global_config "$(test_global_config false true)"
+      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtMonitor"],"read_only_paths":["Download/SrtMonitorLocked","!Download/SrtMonitorLocked/Writable"],"path_mappings":{"Download/SrtMonitorMap":"Download/SrtMonitorMapped"}}}}'
+      ;;
+    27)
+      write_global_config "$(test_global_config true true)"
+      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtMonitor"],"read_only_paths":["Download/SrtMonitorLocked","!Download/SrtMonitorLocked/Writable"],"path_mappings":{"Download/SrtMonitorMap":"Download/SrtMonitorMapped"}}}}'
+      ;;
     *)
       echo "unknown scenario: $1" >&2
       return 1
@@ -243,6 +280,12 @@ scenario_title() {
     19) echo "Fuse daemon 混合模式：同父级多通配符规则互不污染" ;;
     20) echo "默认 mount namespace：allowed_real_paths 通配符回退" ;;
     21) echo "默认 mount namespace：read_only_paths 通配符回退" ;;
+    22) echo "默认 mount namespace：映射最终目标决定只读权限" ;;
+    23) echo "文件监视：未启用重定向的普通应用保存成功记录" ;;
+    24) echo "文件监视：普通应用 fuse daemon 关闭时保存成功、只读失败与只读排除成功记录" ;;
+    25) echo "文件监视：普通应用 fuse daemon 开启时保存成功、只读失败与只读排除成功记录" ;;
+    26) echo "文件监视：系统代写 fuse daemon 关闭时保存成功、只读失败与只读排除成功记录" ;;
+    27) echo "文件监视：系统代写 fuse daemon 开启时保存成功、只读失败与只读排除成功记录" ;;
   esac
 }
 
@@ -254,6 +297,8 @@ clean_targets() {
   adb_su "mkdir -p '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${REAL_ROOT}/Download/SrtMapOnlyMapped' '${REAL_ROOT}/Download/SrtReadOnly' '${REAL_ROOT}/Download/SrtMapRO' '${REAL_ROOT}/Download/SrtAllow/tmp' '${REAL_ROOT}/Pictures/SrtLocked' '${REAL_ROOT}/.xldownload' '${REAL_ROOT}/.xlDownload' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtMapOnlyMapped' '${PRIVATE_ROOT}/Download/SrtReadOnly' '${PRIVATE_ROOT}/Download/SrtMapRO' '${PRIVATE_ROOT}/Download/SrtAllow/tmp' '${PRIVATE_ROOT}/Pictures/SrtLocked' '${PRIVATE_ROOT}/.xldownload' '${PRIVATE_ROOT}/.xlDownload'; chmod -R 777 '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${REAL_ROOT}/Download/SrtMapOnlyMapped' '${REAL_ROOT}/Download/SrtReadOnly' '${REAL_ROOT}/Download/SrtMapRO' '${REAL_ROOT}/Download/SrtAllow' '${REAL_ROOT}/Pictures/SrtLocked' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtMapOnlyMapped' '${PRIVATE_ROOT}/Download/SrtReadOnly' '${PRIVATE_ROOT}/Download/SrtMapRO' '${PRIVATE_ROOT}/Download/SrtAllow' '${PRIVATE_ROOT}/Pictures/SrtLocked' 2>/dev/null || true; chmod 777 '${REAL_ROOT}/.xldownload' '${REAL_ROOT}/.xlDownload' '${PRIVATE_ROOT}/.xldownload' '${PRIVATE_ROOT}/.xlDownload' 2>/dev/null || true" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtLegacy' '${REAL_ROOT}/Download/SrtQMark' '${REAL_ROOT}/Download/SrtLongest' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy' '${PRIVATE_ROOT}/Download/SrtQMark' '${PRIVATE_ROOT}/Download/SrtLongest' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped'; mkdir -p '${REAL_ROOT}/Download/SrtLegacy/tmp' '${REAL_ROOT}/Download/SrtQMark/Keep1' '${REAL_ROOT}/Download/SrtQMark/Keep12' '${REAL_ROOT}/Download/SrtLongest/Deep' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy/tmp' '${PRIVATE_ROOT}/Download/SrtQMark/Keep1' '${PRIVATE_ROOT}/Download/SrtQMark/Keep12' '${PRIVATE_ROOT}/Download/SrtLongest/Deep' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped'; chmod -R 777 '${REAL_ROOT}/Download/SrtLegacy' '${REAL_ROOT}/Download/SrtQMark' '${REAL_ROOT}/Download/SrtLongest' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy' '${PRIVATE_ROOT}/Download/SrtQMark' '${PRIVATE_ROOT}/Download/SrtLongest' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped' 2>/dev/null || true" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtFusePlain' '${REAL_ROOT}/Download/SrtFuseExclude' '${REAL_ROOT}/Download/SrtFuseMapParent' '${REAL_ROOT}/Download/SrtFuseMapRW' '${REAL_ROOT}/Download/SrtFuseMapRO' '${REAL_ROOT}/Download/SrtFuseMulti' '${REAL_ROOT}/DCIM/SrtFuseQQ' '${REAL_ROOT}/DCIM/SrtFuseOther' '${PRIVATE_ROOT}/Download/SrtFusePlain' '${PRIVATE_ROOT}/Download/SrtFuseExclude' '${PRIVATE_ROOT}/Download/SrtFuseMapParent' '${PRIVATE_ROOT}/Download/SrtFuseMapRW' '${PRIVATE_ROOT}/Download/SrtFuseMapRO' '${PRIVATE_ROOT}/Download/SrtFuseMulti' '${PRIVATE_ROOT}/DCIM/SrtFuseQQ' '${PRIVATE_ROOT}/DCIM/SrtFuseOther'; mkdir -p '${REAL_ROOT}/Download/SrtFusePlain' '${REAL_ROOT}/Download/SrtFuseExclude/Locked' '${REAL_ROOT}/Download/SrtFuseExclude/Writable' '${REAL_ROOT}/Download/SrtFuseMapParent/WritableTarget' '${REAL_ROOT}/Download/SrtFuseMapParent/LockedTarget' '${REAL_ROOT}/Download/SrtFuseMapRW' '${REAL_ROOT}/Download/SrtFuseMapRO' '${REAL_ROOT}/Download/SrtFuseMulti/QQ' '${REAL_ROOT}/Download/SrtFuseMulti/WeChat' '${REAL_ROOT}/Download/SrtFuseMulti/Locked' '${REAL_ROOT}/Download/SrtFuseMulti/Other' '${REAL_ROOT}/DCIM/SrtFuseQQ' '${REAL_ROOT}/DCIM/SrtFuseOther' '${PRIVATE_ROOT}/Download/SrtFusePlain' '${PRIVATE_ROOT}/Download/SrtFuseExclude/Locked' '${PRIVATE_ROOT}/Download/SrtFuseExclude/Writable' '${PRIVATE_ROOT}/Download/SrtFuseMapParent/WritableTarget' '${PRIVATE_ROOT}/Download/SrtFuseMapParent/LockedTarget' '${PRIVATE_ROOT}/Download/SrtFuseMapRW' '${PRIVATE_ROOT}/Download/SrtFuseMapRO' '${PRIVATE_ROOT}/Download/SrtFuseMulti/QQ' '${PRIVATE_ROOT}/Download/SrtFuseMulti/WeChat' '${PRIVATE_ROOT}/Download/SrtFuseMulti/Locked' '${PRIVATE_ROOT}/Download/SrtFuseMulti/Other' '${PRIVATE_ROOT}/DCIM/SrtFuseQQ' '${PRIVATE_ROOT}/DCIM/SrtFuseOther'; chmod -R 777 '${REAL_ROOT}/Download/SrtFusePlain' '${REAL_ROOT}/Download/SrtFuseExclude' '${REAL_ROOT}/Download/SrtFuseMapParent' '${REAL_ROOT}/Download/SrtFuseMapRW' '${REAL_ROOT}/Download/SrtFuseMapRO' '${REAL_ROOT}/Download/SrtFuseMulti' '${REAL_ROOT}/DCIM/SrtFuseQQ' '${REAL_ROOT}/DCIM/SrtFuseOther' '${PRIVATE_ROOT}/Download/SrtFusePlain' '${PRIVATE_ROOT}/Download/SrtFuseExclude' '${PRIVATE_ROOT}/Download/SrtFuseMapParent' '${PRIVATE_ROOT}/Download/SrtFuseMapRW' '${PRIVATE_ROOT}/Download/SrtFuseMapRO' '${PRIVATE_ROOT}/Download/SrtFuseMulti' '${PRIVATE_ROOT}/DCIM/SrtFuseQQ' '${PRIVATE_ROOT}/DCIM/SrtFuseOther' 2>/dev/null || true" >/dev/null
+  adb_su "rm -rf '${REAL_ROOT}/Download/SrtMountNsAllow' '${REAL_ROOT}/Download/SrtMountNsReadOnly' '${REAL_ROOT}/Download/SrtMountNsMapParent' '${REAL_ROOT}/Download/SrtMountNsMapRW' '${REAL_ROOT}/Download/SrtMountNsMapRO' '${PRIVATE_ROOT}/Download/SrtMountNsAllow' '${PRIVATE_ROOT}/Download/SrtMountNsReadOnly' '${PRIVATE_ROOT}/Download/SrtMountNsMapParent' '${PRIVATE_ROOT}/Download/SrtMountNsMapRW' '${PRIVATE_ROOT}/Download/SrtMountNsMapRO'; mkdir -p '${REAL_ROOT}/Download/SrtMountNsAllow' '${REAL_ROOT}/Download/SrtMountNsReadOnly' '${REAL_ROOT}/Download/SrtMountNsMapParent/WritableTarget' '${REAL_ROOT}/Download/SrtMountNsMapParent/LockedTarget' '${REAL_ROOT}/Download/SrtMountNsMapRW' '${REAL_ROOT}/Download/SrtMountNsMapRO' '${PRIVATE_ROOT}/Download/SrtMountNsAllow' '${PRIVATE_ROOT}/Download/SrtMountNsReadOnly' '${PRIVATE_ROOT}/Download/SrtMountNsMapParent/WritableTarget' '${PRIVATE_ROOT}/Download/SrtMountNsMapParent/LockedTarget' '${PRIVATE_ROOT}/Download/SrtMountNsMapRW' '${PRIVATE_ROOT}/Download/SrtMountNsMapRO'; chmod -R 777 '${REAL_ROOT}/Download/SrtMountNsAllow' '${REAL_ROOT}/Download/SrtMountNsReadOnly' '${REAL_ROOT}/Download/SrtMountNsMapParent' '${REAL_ROOT}/Download/SrtMountNsMapRW' '${REAL_ROOT}/Download/SrtMountNsMapRO' '${PRIVATE_ROOT}/Download/SrtMountNsAllow' '${PRIVATE_ROOT}/Download/SrtMountNsReadOnly' '${PRIVATE_ROOT}/Download/SrtMountNsMapParent' '${PRIVATE_ROOT}/Download/SrtMountNsMapRW' '${PRIVATE_ROOT}/Download/SrtMountNsMapRO' 2>/dev/null || true" >/dev/null
+  adb_su "rm -rf '${REAL_ROOT}/Download/SrtMonitor' '${REAL_ROOT}/Download/SrtMonitorMap' '${REAL_ROOT}/Download/SrtMonitorMapped' '${REAL_ROOT}/Download/SrtMonitorLocked' '${PRIVATE_ROOT}/Download/SrtMonitor' '${PRIVATE_ROOT}/Download/SrtMonitorMap' '${PRIVATE_ROOT}/Download/SrtMonitorMapped' '${PRIVATE_ROOT}/Download/SrtMonitorLocked'; mkdir -p '${REAL_ROOT}/Download/SrtMonitor' '${REAL_ROOT}/Download/SrtMonitorMap' '${REAL_ROOT}/Download/SrtMonitorMapped' '${REAL_ROOT}/Download/SrtMonitorLocked/Writable' '${PRIVATE_ROOT}/Download/SrtMonitor' '${PRIVATE_ROOT}/Download/SrtMonitorMap' '${PRIVATE_ROOT}/Download/SrtMonitorMapped' '${PRIVATE_ROOT}/Download/SrtMonitorLocked/Writable'; chmod -R 777 '${REAL_ROOT}/Download/SrtMonitor' '${REAL_ROOT}/Download/SrtMonitorMap' '${REAL_ROOT}/Download/SrtMonitorMapped' '${REAL_ROOT}/Download/SrtMonitorLocked' '${PRIVATE_ROOT}/Download/SrtMonitor' '${PRIVATE_ROOT}/Download/SrtMonitorMap' '${PRIVATE_ROOT}/Download/SrtMonitorMapped' '${PRIVATE_ROOT}/Download/SrtMonitorLocked' 2>/dev/null || true" >/dev/null
 }
 
 clean_results() {
@@ -330,7 +375,7 @@ build_scenario_list() {
           return 1
           ;;
       esac
-      if [ "$scenario" -lt 1 ] || [ "$scenario" -gt 21 ]; then
+      if [ "$scenario" -lt 1 ] || [ "$scenario" -gt 27 ]; then
         echo "invalid scenario: $scenario" >&2
         return 1
       fi
@@ -345,7 +390,14 @@ build_scenario_list() {
   else
     echo "skip fuse daemon scenarios: module does not expose fuse_daemon_redirect_enabled or RUN_FUSE_DAEMON_SCENARIOS disabled"
   fi
-  scenarios+=(20 21)
+  scenarios+=(20 21 22)
+  scenarios+=(23 24)
+  if supports_fuse_daemon_scenarios; then
+    scenarios+=(25 26 27)
+  else
+    scenarios+=(26)
+    echo "skip file monitor fuse daemon scenarios: module does not expose fuse_daemon_redirect_enabled or RUN_FUSE_DAEMON_SCENARIOS disabled"
+  fi
 }
 
 remove_test_target_artifacts() {
@@ -353,7 +405,8 @@ remove_test_target_artifacts() {
   adb_su "rm -f '${REAL_ROOT}/Download/$ALLOW_PART_FILE' '${PRIVATE_ROOT}/Download/$ALLOW_PART_FILE' '${REAL_ROOT}/Download/$QMARK_SINGLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_SINGLE_FILE' '${REAL_ROOT}/Download/$QMARK_DOUBLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_DOUBLE_FILE'" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtLegacy' '${REAL_ROOT}/Download/SrtQMark' '${REAL_ROOT}/Download/SrtLongest' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy' '${PRIVATE_ROOT}/Download/SrtQMark' '${PRIVATE_ROOT}/Download/SrtLongest' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped'" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtFusePlain' '${REAL_ROOT}/Download/SrtFuseExclude' '${REAL_ROOT}/Download/SrtFuseMapParent' '${REAL_ROOT}/Download/SrtFuseMapRW' '${REAL_ROOT}/Download/SrtFuseMapRO' '${REAL_ROOT}/Download/SrtFuseMulti' '${REAL_ROOT}/DCIM/SrtFuseQQ' '${REAL_ROOT}/DCIM/SrtFuseOther' '${PRIVATE_ROOT}/Download/SrtFusePlain' '${PRIVATE_ROOT}/Download/SrtFuseExclude' '${PRIVATE_ROOT}/Download/SrtFuseMapParent' '${PRIVATE_ROOT}/Download/SrtFuseMapRW' '${PRIVATE_ROOT}/Download/SrtFuseMapRO' '${PRIVATE_ROOT}/Download/SrtFuseMulti' '${PRIVATE_ROOT}/DCIM/SrtFuseQQ' '${PRIVATE_ROOT}/DCIM/SrtFuseOther'" >/dev/null
-  adb_su "rm -rf '${REAL_ROOT}/Download/SrtMountNsAllow' '${REAL_ROOT}/Download/SrtMountNsReadOnly' '${PRIVATE_ROOT}/Download/SrtMountNsAllow' '${PRIVATE_ROOT}/Download/SrtMountNsReadOnly'" >/dev/null
+  adb_su "rm -rf '${REAL_ROOT}/Download/SrtMountNsAllow' '${REAL_ROOT}/Download/SrtMountNsReadOnly' '${REAL_ROOT}/Download/SrtMountNsMapParent' '${REAL_ROOT}/Download/SrtMountNsMapRW' '${REAL_ROOT}/Download/SrtMountNsMapRO' '${PRIVATE_ROOT}/Download/SrtMountNsAllow' '${PRIVATE_ROOT}/Download/SrtMountNsReadOnly' '${PRIVATE_ROOT}/Download/SrtMountNsMapParent' '${PRIVATE_ROOT}/Download/SrtMountNsMapRW' '${PRIVATE_ROOT}/Download/SrtMountNsMapRO'" >/dev/null
+  adb_su "rm -rf '${REAL_ROOT}/Download/SrtMonitor' '${REAL_ROOT}/Download/SrtMonitorMap' '${REAL_ROOT}/Download/SrtMonitorMapped' '${REAL_ROOT}/Download/SrtMonitorLocked' '${PRIVATE_ROOT}/Download/SrtMonitor' '${PRIVATE_ROOT}/Download/SrtMonitorMap' '${PRIVATE_ROOT}/Download/SrtMonitorMapped' '${PRIVATE_ROOT}/Download/SrtMonitorLocked'" >/dev/null
 }
 
 remove_mediastore_rows_by_pattern() {
@@ -378,6 +431,7 @@ remove_random_mediastore_rows() {
   remove_mediastore_rows_by_pattern "content://media/external/audio/media" '_display_name=srt_audio_[0-9]+\.mp3(,|$)' "relative_path=Music/|_data=.*/Music/|_data=.*/Android/data/${app_regex}/sdcard/Music/"
   remove_mediastore_rows_by_pattern "content://media/external/file" '_display_name=srt_file_[0-9]+\.txt(,|$)' "relative_path=Documents/|_data=.*/Documents/|_data=.*/Android/data/${app_regex}/sdcard/Documents/"
   remove_mediastore_rows_by_pattern "content://media/external/downloads" '_display_name=(srt_download_[0-9]+\.bin|srt_ci_probe\.part|srt_qmark_a\.txt|srt_qmark_ab\.txt)(,|$)' "relative_path=Download/|_data=.*/Download/|_data=.*/Android/data/${app_regex}/sdcard/Download/"
+  remove_mediastore_rows_by_pattern "content://media/external/downloads" '_display_name=srt_monitor_[A-Za-z0-9_.-]+\.bin(,|$)' "relative_path=Download/SrtMonitor|relative_path=Download/SrtMonitorMap|relative_path=Download/SrtMonitorMapped|relative_path=Download/SrtMonitorLocked|_data=.*/Download/SrtMonitor|_data=.*/Android/data/${app_regex}/sdcard/Download/SrtMonitor"
 }
 
 remove_random_physical_media_files() {
@@ -386,6 +440,7 @@ remove_random_physical_media_files() {
   adb_su "find '$BACKEND_ROOT/Music' '$BACKEND_PRIVATE_ROOT/Music' -maxdepth 1 -type f -name 'srt_audio_[0-9]*.mp3' -delete 2>/dev/null || true" >/dev/null
   adb_su "find '$BACKEND_ROOT/Documents' '$BACKEND_PRIVATE_ROOT/Documents' -maxdepth 1 -type f -name 'srt_file_[0-9]*.txt' -delete 2>/dev/null || true" >/dev/null
   adb_su "find '$BACKEND_ROOT/Download' '$BACKEND_PRIVATE_ROOT/Download' -maxdepth 1 -type f -name 'srt_download_[0-9]*.bin' -delete 2>/dev/null || true" >/dev/null
+  adb_su "find '$BACKEND_ROOT/Download/SrtMonitor' '$BACKEND_ROOT/Download/SrtMonitorMap' '$BACKEND_ROOT/Download/SrtMonitorMapped' '$BACKEND_ROOT/Download/SrtMonitorLocked' '$BACKEND_PRIVATE_ROOT/Download/SrtMonitor' '$BACKEND_PRIVATE_ROOT/Download/SrtMonitorMap' '$BACKEND_PRIVATE_ROOT/Download/SrtMonitorMapped' '$BACKEND_PRIVATE_ROOT/Download/SrtMonitorLocked' -type f -name 'srt_monitor_*.bin' -delete 2>/dev/null || true" >/dev/null
   adb_su "rm -rf '$BACKEND_ROOT/Android/data/$APP_ID/files/test_case_result' '$BACKEND_ROOT/Android/data/$APP_ID/files/srt_file_tests' '$INTERNAL_RESULT_DIR' '/data/data/$APP_ID/files/srt_file_tests' '$SANDBOX_RESULT_DIR' '$BACKEND_PRIVATE_ROOT/Android/data/$APP_ID/files/srt_file_tests' 2>/dev/null || true" >/dev/null
 }
 
@@ -394,6 +449,71 @@ restart_media_provider() {
   adb shell am force-stop com.google.android.providers.media.module >/dev/null 2>&1 || true
   adb_su "pkill -f com.android.providers.media.module 2>/dev/null || true; pkill -f com.google.android.providers.media.module 2>/dev/null || true" >/dev/null 2>&1 || true
   sleep 2
+}
+
+ensure_monitor_collector() {
+  adb_su "touch /data/adb/modules/storage.redirect.x/config/apps '$GLOBAL_CONFIG' '$CONFIG' 2>/dev/null || true" >/dev/null 2>&1 || true
+  adb_su "/data/adb/modules/storage.redirect.x/bin/srxctl ensure-collectors" >/dev/null 2>&1 || true
+}
+
+clear_file_monitor_log() {
+  adb_su "mkdir -p '/data/adb/modules/storage.redirect.x/logs'; : > '$FILE_MONITOR_LOG_PATH'" >/dev/null 2>&1 || true
+}
+
+prepare_file_monitor_assertion() {
+  local scenario="$1"
+  local label="$2"
+  echo "monitor_prepare scenario=${scenario} label=${label}"
+  adb logcat -c >/dev/null 2>&1 || true
+  clear_file_monitor_log
+  ensure_monitor_collector
+  sleep_ms "$SRT_SERVICE_CASE_SETTLE_MS"
+}
+
+wait_file_monitor_log_line() {
+  local scenario="$1"
+  local label="$2"
+  local file_name="$3"
+  local expected="$4"
+  local timeout_seconds="${5:-30}"
+  local deadline=$((SECONDS + timeout_seconds))
+
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    case "$expected" in
+      success)
+        if adb_su "grep -F -- '$APP_ID' '$FILE_MONITOR_LOG_PATH' 2>/dev/null | grep -F -- '$file_name' | grep -Fv -- 'ret=-1' | grep -Fv -- 'op=close_write' >/dev/null"; then
+          echo "monitor_log_found scenario=${scenario} label=${label} file=${file_name} expected=${expected}"
+          return 0
+        fi
+        ;;
+      failure)
+        if adb_su "grep -F -- '$APP_ID' '$FILE_MONITOR_LOG_PATH' 2>/dev/null | grep -F -- '$file_name' | grep -F -- 'ret=-1' | grep -F -- 'deny_reason=read_only_rule' >/dev/null"; then
+          echo "monitor_log_found scenario=${scenario} label=${label} file=${file_name} expected=${expected}"
+          return 0
+        fi
+        ;;
+    esac
+    sleep_ms 200
+  done
+
+  echo "monitor_log_timeout scenario=${scenario} label=${label} file=${file_name} expected=${expected}"
+  adb_su "tail -80 '$FILE_MONITOR_LOG_PATH' 2>/dev/null || true" | sed 's/^/monitor_log_tail: /'
+  return 1
+}
+
+expect_file_monitor_success_record() {
+  local scenario="$1"
+  local label="$2"
+  local file_name="$3"
+  wait_file_monitor_log_line "$scenario" "$label" "$file_name" "success"
+}
+
+expect_file_monitor_failure_record() {
+  local scenario="$1"
+  local label="$2"
+  local file_name="$3"
+  local timeout_seconds="${4:-30}"
+  wait_file_monitor_log_line "$scenario" "$label" "$file_name" "failure" "$timeout_seconds"
 }
 
 cleanup_test_artifacts() {
@@ -599,7 +719,24 @@ run_mediastore_download_create_case() {
   local scenario="$1"
   local label="$2"
   local file_name="$3"
-  run_service_case "$scenario" "$label" "mediastore_create_download" '^PASS \[mediastore_create_download\]' --es file_name "$file_name"
+  local relative_path="${4:-}"
+  if [ -n "$relative_path" ]; then
+    run_service_case "$scenario" "$label" "mediastore_create_download" '^PASS \[mediastore_create_download\]' --es file_name "$file_name" --es relative_path "$relative_path"
+  else
+    run_service_case "$scenario" "$label" "mediastore_create_download" '^PASS \[mediastore_create_download\]' --es file_name "$file_name"
+  fi
+}
+
+run_mediastore_download_create_denied_case() {
+  local scenario="$1"
+  local label="$2"
+  local file_name="$3"
+  local relative_path="${4:-}"
+  if [ -n "$relative_path" ]; then
+    run_service_case "$scenario" "$label" "mediastore_create_download_denied" '^PASS \[mediastore_create_download_denied\]' --es file_name "$file_name" --es relative_path "$relative_path"
+  else
+    run_service_case "$scenario" "$label" "mediastore_create_download_denied" '^PASS \[mediastore_create_download_denied\]' --es file_name "$file_name"
+  fi
 }
 
 run_write_test() {
@@ -922,6 +1059,116 @@ run_mount_namespace_read_only_wildcard_fallback_scenario() {
     check_file_missing "mount-ns-denied-private" "$denied_private"
 }
 
+run_mount_namespace_mapping_read_only_scenario() {
+  local scenario="$1"
+  local rw_request="$MOUNT_NS_MAP_RW_REQUEST/$TEST_FILE"
+  local rw_target="$MOUNT_NS_MAP_RW_TARGET/$TEST_FILE"
+  local ro_request="$MOUNT_NS_MAP_RO_REQUEST/$TEST_FILE"
+  local ro_target="$MOUNT_NS_MAP_RO_TARGET/$TEST_FILE"
+
+  run_write_case "$scenario" "mapping-target-write" "$rw_request" "$PAYLOAD" &&
+    check_file_exists "mount-ns-mapping-rw-target" "$rw_target" &&
+    check_file_missing "mount-ns-mapping-rw-request" "$rw_request" &&
+    run_service_case "$scenario" "mapping-target-read-only-denied" "file_write_denied" '^PASS \[file_write_denied\]' --es file_path "$ro_request" --es payload "$PAYLOAD" &&
+    check_file_missing "mount-ns-mapping-ro-target" "$ro_target" &&
+    check_file_missing "mount-ns-mapping-ro-request" "$ro_request"
+}
+
+monitor_file_name() {
+  local scenario="$1"
+  local label="$2"
+  printf 'srt_monitor_%s_%s.bin' "$scenario" "$label" | tr -c 'A-Za-z0-9_.-' '_'
+}
+
+run_file_monitor_write_success_case() {
+  local scenario="$1"
+  local label="$2"
+  local path="$3"
+  local expected_path="${4:-$path}"
+  local private_path="${5:-}"
+  local file_name
+  file_name="$(basename "$path")"
+
+  prepare_file_monitor_assertion "$scenario" "$label"
+  run_write_case "$scenario" "$label" "$path" "$PAYLOAD" &&
+    check_file_exists "scenario-${scenario}-${label}-expected" "$expected_path" &&
+    { [ -z "$private_path" ] || check_file_missing "scenario-${scenario}-${label}-private" "$private_path"; } &&
+    expect_file_monitor_success_record "$scenario" "$label" "$file_name"
+}
+
+run_file_monitor_write_denied_case() {
+  local scenario="$1"
+  local label="$2"
+  local path="$3"
+  local missing_path="${4:-$path}"
+  local file_name
+  file_name="$(basename "$path")"
+
+  prepare_file_monitor_assertion "$scenario" "$label"
+  run_service_case "$scenario" "$label" "file_write_denied" '^PASS \[file_write_denied\]' --es file_path "$path" --es payload "$PAYLOAD" &&
+    check_file_missing "scenario-${scenario}-${label}-missing" "$missing_path" &&
+    expect_file_monitor_failure_record "$scenario" "$label" "$file_name"
+}
+
+run_file_monitor_mediastore_success_case() {
+  local scenario="$1"
+  local label="$2"
+  local relative_path="$3"
+  local expected_path="$4"
+  local private_path="${5:-}"
+  local file_name
+  file_name="$(monitor_file_name "$scenario" "$label")"
+
+  prepare_file_monitor_assertion "$scenario" "$label"
+  run_mediastore_download_create_case "$scenario" "$label" "$file_name" "$relative_path" &&
+    check_file_exists "scenario-${scenario}-${label}-expected" "$expected_path/$file_name" &&
+    { [ -z "$private_path" ] || check_file_missing "scenario-${scenario}-${label}-private" "$private_path/$file_name"; } &&
+    expect_file_monitor_success_record "$scenario" "$label" "$file_name"
+}
+
+run_file_monitor_mediastore_denied_case() {
+  local scenario="$1"
+  local label="$2"
+  local relative_path="$3"
+  local missing_path="$4"
+  local file_name
+  file_name="$(monitor_file_name "$scenario" "$label")"
+
+  prepare_file_monitor_assertion "$scenario" "$label"
+  run_mediastore_download_create_denied_case "$scenario" "$label" "$file_name" "$relative_path" &&
+    check_file_missing "scenario-${scenario}-${label}-missing" "$missing_path/$file_name" &&
+    expect_file_monitor_failure_record "$scenario" "$label" "$file_name"
+}
+
+run_file_monitor_disabled_redirect_scenario() {
+  local scenario="$1"
+  local file_name
+  file_name="$(monitor_file_name "$scenario" "disabled_regular")"
+  run_file_monitor_write_success_case "$scenario" "disabled-regular-write" "$MONITOR_BASE_ROOT/$file_name" "$MONITOR_BASE_ROOT/$file_name" "$PRIVATE_MONITOR_BASE_ROOT/$file_name"
+}
+
+run_file_monitor_regular_scenario() {
+  local scenario="$1"
+  local allow_file map_file locked_file writable_file
+  allow_file="$(monitor_file_name "$scenario" "regular_allow")"
+  map_file="$(monitor_file_name "$scenario" "regular_map")"
+  locked_file="$(monitor_file_name "$scenario" "regular_locked")"
+  writable_file="$(monitor_file_name "$scenario" "regular_writable")"
+
+  run_file_monitor_write_success_case "$scenario" "regular-allow-write" "$MONITOR_BASE_ROOT/$allow_file" "$MONITOR_BASE_ROOT/$allow_file" "$PRIVATE_MONITOR_BASE_ROOT/$allow_file" &&
+    run_file_monitor_write_success_case "$scenario" "regular-mapped-write" "$MONITOR_MAP_REQUEST/$map_file" "$MONITOR_MAP_TARGET/$map_file" &&
+    run_file_monitor_write_denied_case "$scenario" "regular-read-only-denied" "$MONITOR_LOCKED_ROOT/$locked_file" "$MONITOR_LOCKED_ROOT/$locked_file" &&
+    run_file_monitor_write_success_case "$scenario" "regular-read-only-excluded-write" "$MONITOR_WRITABLE_ROOT/$writable_file" "$MONITOR_WRITABLE_ROOT/$writable_file" "$PRIVATE_MONITOR_WRITABLE_ROOT/$writable_file"
+}
+
+run_file_monitor_mediastore_scenario() {
+  local scenario="$1"
+  run_file_monitor_mediastore_success_case "$scenario" "media-allow-create" "Download/SrtMonitor" "$MONITOR_BASE_ROOT" "$PRIVATE_MONITOR_BASE_ROOT" &&
+    run_file_monitor_mediastore_success_case "$scenario" "media-mapped-create" "Download/SrtMonitorMap" "$MONITOR_MAP_TARGET" &&
+    run_file_monitor_mediastore_denied_case "$scenario" "media-read-only-denied" "Download/SrtMonitorLocked" "$MONITOR_LOCKED_ROOT" &&
+    run_file_monitor_mediastore_success_case "$scenario" "media-read-only-excluded-create" "Download/SrtMonitorLocked/Writable" "$MONITOR_WRITABLE_ROOT" "$PRIVATE_MONITOR_WRITABLE_ROOT"
+}
+
 check_health() {
   adb shell "count=\$(ps -A | grep -c 'com.google.android.providers.media.module' || true); echo media_count=\$count; ps -A | grep 'com.google.android.providers.media.module' || true; pid=\$(pidof com.google.android.providers.media.module 2>/dev/null || true); echo media_pid=\$pid; if [ -n \"\$pid\" ]; then echo threads=\$(ls /proc/\$pid/task 2>/dev/null | wc -l); ps -A -o PID,RSS,NAME | grep 'com.google.android.providers.media.module' || true; fi" | tee media-health.txt
   local count
@@ -965,7 +1212,7 @@ run_scenario() {
   esac
   apply_config "$scenario"
   case "$scenario" in
-    20|21)
+    20|21|22)
       echo "step 2/7: 清理并预置 mount namespace 回退目标"
       clean_targets
       if [ "$scenario" = "21" ]; then
@@ -1037,6 +1284,22 @@ run_scenario() {
       echo "step 5/7: 执行默认 mount namespace 只读路径通配符回退验证"
       run_mount_namespace_read_only_wildcard_fallback_scenario "$scenario"
       ;;
+    22)
+      echo "step 5/7: 执行默认 mount namespace 映射最终目标只读判定验证"
+      run_mount_namespace_mapping_read_only_scenario "$scenario"
+      ;;
+    23)
+      echo "step 5/7: 执行未启用重定向普通应用文件监视记录验证"
+      run_file_monitor_disabled_redirect_scenario "$scenario"
+      ;;
+    24|25)
+      echo "step 5/7: 执行普通应用文件监视记录矩阵验证"
+      run_file_monitor_regular_scenario "$scenario"
+      ;;
+    26|27)
+      echo "step 5/7: 执行系统代写文件监视记录矩阵验证"
+      run_file_monitor_mediastore_scenario "$scenario"
+      ;;
     *)
       run_standard_scenario "$scenario"
       ;;
@@ -1064,8 +1327,8 @@ adb_su ": > '$LOG_PATH' 2>/dev/null || true" >/dev/null
 fail=0
 build_scenario_list
 
-export APP_ID CONFIG GLOBAL_CONFIG LOG_PATH ACTION RESULT_DIR INTERNAL_RESULT_DIR REAL_ROOT BACKEND_ROOT PRIVATE_ROOT BACKEND_PRIVATE_ROOT SANDBOX_RESULT_DIR TEST_FILE READ_ONLY_FILE ALLOW_KEEP_FILE ALLOW_PART_FILE QMARK_SINGLE_FILE QMARK_DOUBLE_FILE READ_ONLY_HARDLINK READ_ONLY_SYMLINK PAYLOAD READ_ONLY_PAYLOAD READ_ONLY_ROOT MAPPED_READ_ONLY_REQUEST MAPPED_READ_ONLY_TARGET ALLOW_ROOT PRIVATE_ALLOW_ROOT LEGACY_ROOT PRIVATE_LEGACY_ROOT QMARK_ROOT PRIVATE_QMARK_ROOT FUSE_PLAIN_ROOT PRIVATE_FUSE_PLAIN_ROOT FUSE_DCIM_ROOT PRIVATE_FUSE_DCIM_ROOT FUSE_DCIM_OTHER_ROOT PRIVATE_FUSE_DCIM_OTHER_ROOT FUSE_EXCLUDE_ROOT PRIVATE_FUSE_EXCLUDE_ROOT FUSE_MAP_PARENT FUSE_MAP_RW_REQUEST FUSE_MAP_RO_REQUEST FUSE_MAP_RW_TARGET FUSE_MAP_RO_TARGET FUSE_MULTI_ROOT PRIVATE_FUSE_MULTI_ROOT MOUNT_NS_ALLOW_ROOT PRIVATE_MOUNT_NS_ALLOW_ROOT MOUNT_NS_READ_ONLY_ROOT PRIVATE_MOUNT_NS_READ_ONLY_ROOT SRT_FRESH_APP_PER_CASE SRT_RESULT_POLL_MS SRT_APP_LAUNCH_SETTLE_MS SRT_MOUNT_CONFIRM_TIMEOUT_MS SRT_SERVICE_CASE_SETTLE_MS SRT_FILE_MONITOR_ENABLED
-export -f adb_root adb_su wait_boot_completed write_config write_global_config test_global_config enable_fuse_daemon_config disable_fuse_daemon_config use_mount_namespace_fallback_config apply_config target_path logical_dir expected_path scenario_title clean_targets clean_results latest_result wait_service_result wait_app_mount_confirmed prepare_service_case wait_storage_ready media_provider_query_ready wait_media_provider_ready print_storage_state run_service_case run_write_case run_create_case run_mediastore_download_create_case run_write_test check_app_view expect_app_entry expect_no_app_entry find_written_file check_file_exists check_file_missing check_file_location seed_read_only_targets check_read_only_artifacts run_read_only_scenario prepare_mapped_read_only_targets run_mapped_read_only_scenario run_allow_exclusion_scenario run_legacy_exclusion_scenario run_qmark_wildcard_scenario check_fuse_daemon_started run_fuse_daemon_allow_wildcard_scenario run_fuse_daemon_read_only_exclusion_scenario run_fuse_daemon_mapping_read_only_scenario run_fuse_daemon_multi_wildcard_scenario set_mount_namespace_read_only_seed run_mount_namespace_allow_wildcard_fallback_scenario run_mount_namespace_read_only_wildcard_fallback_scenario check_health print_diagnostics run_standard_scenario run_scenario
+export APP_ID CONFIG GLOBAL_CONFIG LOG_PATH FILE_MONITOR_LOG_PATH ACTION RESULT_DIR INTERNAL_RESULT_DIR REAL_ROOT BACKEND_ROOT PRIVATE_ROOT BACKEND_PRIVATE_ROOT SANDBOX_RESULT_DIR TEST_FILE READ_ONLY_FILE ALLOW_KEEP_FILE ALLOW_PART_FILE QMARK_SINGLE_FILE QMARK_DOUBLE_FILE READ_ONLY_HARDLINK READ_ONLY_SYMLINK PAYLOAD READ_ONLY_PAYLOAD READ_ONLY_ROOT MAPPED_READ_ONLY_REQUEST MAPPED_READ_ONLY_TARGET ALLOW_ROOT PRIVATE_ALLOW_ROOT LEGACY_ROOT PRIVATE_LEGACY_ROOT QMARK_ROOT PRIVATE_QMARK_ROOT FUSE_PLAIN_ROOT PRIVATE_FUSE_PLAIN_ROOT FUSE_DCIM_ROOT PRIVATE_FUSE_DCIM_ROOT FUSE_DCIM_OTHER_ROOT PRIVATE_FUSE_DCIM_OTHER_ROOT FUSE_EXCLUDE_ROOT PRIVATE_FUSE_EXCLUDE_ROOT FUSE_MAP_PARENT FUSE_MAP_RW_REQUEST FUSE_MAP_RO_REQUEST FUSE_MAP_RW_TARGET FUSE_MAP_RO_TARGET FUSE_MULTI_ROOT PRIVATE_FUSE_MULTI_ROOT MOUNT_NS_ALLOW_ROOT PRIVATE_MOUNT_NS_ALLOW_ROOT MOUNT_NS_READ_ONLY_ROOT PRIVATE_MOUNT_NS_READ_ONLY_ROOT MOUNT_NS_MAP_PARENT MOUNT_NS_MAP_RW_REQUEST MOUNT_NS_MAP_RO_REQUEST MOUNT_NS_MAP_RW_TARGET MOUNT_NS_MAP_RO_TARGET MONITOR_BASE_ROOT PRIVATE_MONITOR_BASE_ROOT MONITOR_MAP_REQUEST MONITOR_MAP_TARGET MONITOR_LOCKED_ROOT MONITOR_WRITABLE_ROOT PRIVATE_MONITOR_WRITABLE_ROOT SRT_FRESH_APP_PER_CASE SRT_RESULT_POLL_MS SRT_APP_LAUNCH_SETTLE_MS SRT_MOUNT_CONFIRM_TIMEOUT_MS SRT_SERVICE_CASE_SETTLE_MS SRT_FILE_MONITOR_ENABLED
+export -f adb_root adb_su wait_boot_completed write_config write_global_config test_global_config enable_fuse_daemon_config disable_fuse_daemon_config use_mount_namespace_fallback_config apply_config target_path logical_dir expected_path scenario_title clean_targets clean_results latest_result wait_service_result wait_app_mount_confirmed prepare_service_case wait_storage_ready media_provider_query_ready wait_media_provider_ready print_storage_state run_service_case run_write_case run_create_case run_mediastore_download_create_case run_mediastore_download_create_denied_case run_write_test check_app_view expect_app_entry expect_no_app_entry find_written_file check_file_exists check_file_missing check_file_location seed_read_only_targets check_read_only_artifacts run_read_only_scenario prepare_mapped_read_only_targets run_mapped_read_only_scenario run_allow_exclusion_scenario run_legacy_exclusion_scenario run_qmark_wildcard_scenario check_fuse_daemon_started run_fuse_daemon_allow_wildcard_scenario run_fuse_daemon_read_only_exclusion_scenario run_fuse_daemon_mapping_read_only_scenario run_fuse_daemon_multi_wildcard_scenario set_mount_namespace_read_only_seed run_mount_namespace_allow_wildcard_fallback_scenario run_mount_namespace_read_only_wildcard_fallback_scenario run_mount_namespace_mapping_read_only_scenario ensure_monitor_collector clear_file_monitor_log prepare_file_monitor_assertion wait_file_monitor_log_line expect_file_monitor_success_record expect_file_monitor_failure_record monitor_file_name run_file_monitor_write_success_case run_file_monitor_write_denied_case run_file_monitor_mediastore_success_case run_file_monitor_mediastore_denied_case run_file_monitor_disabled_redirect_scenario run_file_monitor_regular_scenario run_file_monitor_mediastore_scenario check_health print_diagnostics run_standard_scenario run_scenario
 
 for scenario in "${scenarios[@]}"; do
   echo "::group::scenario ${scenario}: $(scenario_title "$scenario")"

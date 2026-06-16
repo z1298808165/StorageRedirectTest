@@ -62,17 +62,18 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
         mediaType: IMediaStoreApi.MediaType,
         volumeType: IMediaStoreApi.VolumeType,
         fileName: String,
-        content: ByteArray
+        content: ByteArray,
+        relativePath: String?
     ): Uri? {
         if (fileName.isBlank() || content.isEmpty()) return null
         val collectionUri = resolveCollectionUri(mediaType, volumeType)
         val mimeType = guessMimeType(fileName, mediaType)
-        val relativePath = resolveRelativePath(mediaType)
-        deleteExistingMediaRows(collectionUri, relativePath, fileName)
+        val targetRelativePath = normalizeRelativePath(relativePath) ?: resolveRelativePath(mediaType)
+        deleteExistingMediaRows(collectionUri, targetRelativePath, fileName)
         val pendingValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
             put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, targetRelativePath)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
             if (mediaType == IMediaStoreApi.MediaType.FILE) {
                 put(
@@ -114,7 +115,7 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
                 context.contentResolver.delete(uri, null, null)
             } catch (_: Exception) {
             }
-            deleteExistingMediaRows(collectionUri, relativePath, fileName)
+            deleteExistingMediaRows(collectionUri, targetRelativePath, fileName)
             null
         }
     }
@@ -182,6 +183,17 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
             IMediaStoreApi.MediaType.FILE -> "${Environment.DIRECTORY_DOCUMENTS}/"
             IMediaStoreApi.MediaType.DOWNLOAD -> "${Environment.DIRECTORY_DOWNLOADS}/"
         }
+
+    private fun normalizeRelativePath(relativePath: String?): String? {
+        val cleaned = relativePath
+            ?.replace('\\', '/')
+            ?.split('/')
+            ?.filter { it.isNotBlank() && it != "." && it != ".." }
+            ?.joinToString("/")
+            ?.trim()
+            .orEmpty()
+        return cleaned.takeIf { it.isNotBlank() }?.let { "$it/" }
+    }
 
     private fun guessMimeType(fileName: String, mediaType: IMediaStoreApi.MediaType): String {
         val extension = fileName.substringAfterLast('.', "").lowercase()

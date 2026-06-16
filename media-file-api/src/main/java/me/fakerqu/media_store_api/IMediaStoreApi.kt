@@ -56,7 +56,8 @@ interface IMediaStoreApi {
         mediaType: MediaType,
         volumeType: VolumeType,
         fileName: String,
-        content: ByteArray
+        content: ByteArray,
+        relativePath: String? = null
     ): Uri?
 
     /**

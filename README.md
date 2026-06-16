@@ -171,6 +171,7 @@ adb shell am start-foreground-service -n me.fakerqu.test.storageredirect/.TestSe
 - `target_file_path`：`file_rename` / `file_rename_denied` 的目标路径。
 - `file_dir`：目录列表和 mkdir 类用例的目标目录。
 - `file_name`：MediaStore 创建用例的文件名，或 `mediastore_query_path_*` 用例用于定位目标行的文件名。
+- `relative_path`：MediaStore 创建用例写入的相对目录，例如 `Download/SrtMonitor`；未传入时使用媒体类型默认目录。
 - `payload`：写入内容。
 - `expected_payload`：读回校验内容。
 - `expected_path`：`file_readlink` 的期望链接目标，或 `mediastore_query_path_*` 的期望 cursor `DATA` 路径。
@@ -186,9 +187,9 @@ cd /c/Users/12988/Desktop/StorageRedirectTest
 bash .github/scripts/run-storage-redirect-scenarios.sh
 ```
 
-脚本会遍历基础 15 个场景；如果当前模块支持 `fuse_daemon_redirect_enabled`，还会追加运行 4 个 FUSE daemon 混合模式场景，并且始终会运行 2 个默认 mount namespace 的通配符回退场景。可以通过 `RUN_FUSE_DAEMON_SCENARIOS=1` 强制运行，或通过 `RUN_FUSE_DAEMON_SCENARIOS=0` 跳过 FUSE daemon 场景。
+脚本会遍历基础 15 个场景；如果当前模块支持 `fuse_daemon_redirect_enabled`，还会追加运行 4 个 FUSE daemon 混合模式场景，并且始终会运行 3 个默认 mount namespace 场景：通配符放行回退、通配符只读回退、映射最终目标只读判定。脚本还包含文件监视记录场景：普通应用关闭重定向时的公共路径保存仍应有外部监视成功记录；普通应用和系统代写保存分别覆盖 fuse daemon 关闭/开启下的放行成功、映射成功、最终路径只读失败、只读排除成功记录。可以通过 `RUN_FUSE_DAEMON_SCENARIOS=1` 强制运行，或通过 `RUN_FUSE_DAEMON_SCENARIOS=0` 跳过 FUSE daemon 场景。
 
-脚本默认只在每个场景切换配置后冷启动一次测试 App，单个 `TestService` 用例不会再重复 `force-stop` 和启动界面；测试 App 会写入固定的 `result_current.txt` 供脚本设备侧等待读取，减少每个用例反复扫描结果目录的 ADB 往返。为了让只读和 mount namespace 回退场景保持挂载语义，脚本默认把 `file_monitor_enabled` 关掉；需要单独验证文件监视时可设置 `SRT_FILE_MONITOR_ENABLED=1`。排查隔离问题需要恢复旧的逐用例冷启动时，可以设置 `SRT_FRESH_APP_PER_CASE=1`；只跑部分场景可设置 `SRT_SCENARIOS=9,17,19,21`。结果轮询间隔可用 `SRT_RESULT_POLL_MS` 调整，默认 150ms；启动后缓冲可用 `SRT_APP_LAUNCH_SETTLE_MS` 调整，默认 800ms；如需调试启动时序，可设置 `SRT_MOUNT_CONFIRM_TIMEOUT_MS` 等待模块日志中的 `app mount confirmed pid=...`，默认不等待；用例间缓冲可用 `SRT_SERVICE_CASE_SETTLE_MS` 调整，默认 50ms。
+脚本默认只在每个场景切换配置后冷启动一次测试 App，单个 `TestService` 用例不会再重复 `force-stop` 和启动界面；测试 App 会写入固定的 `result_current.txt` 供脚本设备侧等待读取，减少每个用例反复扫描结果目录的 ADB 往返。非文件监视场景默认把 `file_monitor_enabled` 关掉，以保持只读和 mount namespace 回退场景的挂载语义；文件监视场景会显式开启它，验证普通应用和系统代写保存记录。调试其它场景的文件监视时可设置 `SRT_FILE_MONITOR_ENABLED=1`。排查隔离问题需要恢复旧的逐用例冷启动时，可以设置 `SRT_FRESH_APP_PER_CASE=1`；只跑部分场景可设置 `SRT_SCENARIOS=9,17,19,22,23,24,26`。结果轮询间隔可用 `SRT_RESULT_POLL_MS` 调整，默认 150ms；启动后缓冲可用 `SRT_APP_LAUNCH_SETTLE_MS` 调整，默认 800ms；如需调试启动时序，可设置 `SRT_MOUNT_CONFIRM_TIMEOUT_MS` 等待模块日志中的 `app mount confirmed pid=...`，默认不等待；用例间缓冲可用 `SRT_SERVICE_CASE_SETTLE_MS` 调整，默认 50ms。
 
 - 未启用应用配置，验证默认真实路径写入。
 - 启用重定向，验证写入应用私有空间。
@@ -211,13 +212,17 @@ bash .github/scripts/run-storage-redirect-scenarios.sh
 - 启用全局 `fuse_daemon_redirect_enabled`，验证同一父级路径下多个通配符规则互不污染：分别放行的子路径保持真实写入，只读通配符子路径拒绝写入，未命中的兄弟路径进入应用私有空间。
 - 关闭 `fuse_daemon_redirect_enabled` 时，验证默认 mount namespace 下 `allowed_real_paths` 的通配符不会被忽略，而是回退到预期的具体路径规则。
 - 关闭 `fuse_daemon_redirect_enabled` 时，验证默认 mount namespace 下 `read_only_paths` 的通配符不会被忽略，而是回退到预期的具体路径规则，并继续保持只读拒绝语义。
+- 关闭 `fuse_daemon_redirect_enabled` 时，验证默认 mount namespace 下路径映射和只读规则同时存在时，写权限仍由映射最终目标决定：请求路径不会被错误创建，最终目标被 `!` 排除则可写，最终目标仍落在只读父路径下则拒绝写入。
+- 启用 `file_monitor_enabled` 且普通应用关闭重定向时，验证普通公共路径保存仍由 daemon 外部监控，保存成功后 `file_monitor.log` 有成功记录。
+- 启用 `file_monitor_enabled` 且 fuse daemon 关闭/开启时，验证普通应用直接保存到放行路径或映射请求路径后都有成功记录；最终路径命中只读规则时有失败记录；最终路径命中只读排除规则时有成功记录。
+- 启用 `file_monitor_enabled` 且 fuse daemon 关闭/开启时，验证 MediaStore 系统代写方式在放行路径、映射请求路径、最终只读路径、最终只读排除路径下分别产生对应成功或失败记录。
 
 脚本输出 `scenario-*-result.txt` 和 `media-health.txt`。失败时会抓取模块配置、模块日志、存储挂载状态和相关 logcat。
 
 脚本开跑前和清理后会重启 MediaProvider，避免上一轮 shell 侧 MediaStore 清理影响下一轮 MediaStore 写入归因。脚本结束时会执行设备侧清理，成功和失败都会尽量收尾。清理范围是白名单式的：
 
 - 测试 App 的 `test_case_result` 和 `srt_file_tests` 目录，包括被 SRX 重定向后的 App 私有镜像路径。
-- 场景脚本创建的 `Download/Srt*`、`Pictures/SrtLocked`、`DCIM/SrtFuse*` 等固定测试目录，以及固定文件 `srt_ci_probe.part`、`srt_qmark_a.txt`、`srt_qmark_ab.txt`。
+- 场景脚本创建的 `Download/Srt*`、`Pictures/SrtLocked`、`DCIM/SrtFuse*` 等固定测试目录，以及固定文件 `srt_ci_probe.part`、`srt_qmark_a.txt`、`srt_qmark_ab.txt` 和文件监视专用 `srt_monitor_*.bin`。
 - MediaStore 中名称匹配 `srt_image_<数字>.jpg`、`srt_video_<数字>.mp4`、`srt_audio_<数字>.mp3`、`srt_file_<数字>.txt`、`srt_download_<数字>.bin` 的测试行，并且只限定在对应的 Pictures、Movies、Music、Documents、Download 或测试 App 私有镜像路径。
 - 真实物理目录中同样命名规则的随机测试文件，只在上述公共媒体目录和测试 App 私有镜像目录的第一层删除。
 
