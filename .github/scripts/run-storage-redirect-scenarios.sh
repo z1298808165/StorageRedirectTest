@@ -281,7 +281,7 @@ scenario_title() {
     20) echo "默认 mount namespace：allowed_real_paths 通配符回退" ;;
     21) echo "默认 mount namespace：read_only_paths 通配符回退" ;;
     22) echo "默认 mount namespace：映射最终目标决定只读权限" ;;
-    23) echo "文件监视：未启用重定向的普通应用保存成功记录" ;;
+    23) echo "文件监视：未启用重定向的普通应用与系统代写保存成功记录" ;;
     24) echo "文件监视：普通应用 fuse daemon 关闭时保存成功、只读失败与只读排除成功记录" ;;
     25) echo "文件监视：普通应用 fuse daemon 开启时保存成功、只读失败与只读排除成功记录" ;;
     26) echo "文件监视：系统代写 fuse daemon 关闭时保存成功、只读失败与只读排除成功记录" ;;
@@ -460,10 +460,22 @@ clear_file_monitor_log() {
   adb_su "mkdir -p '/data/adb/modules/storage.redirect.x/logs'; : > '$FILE_MONITOR_LOG_PATH'" >/dev/null 2>&1 || true
 }
 
+assert_file_monitor_enabled_for_scenario() {
+  local scenario="$1"
+  local label="$2"
+  if adb_su "grep -Eq '\"file_monitor_enabled\"[[:space:]]*:[[:space:]]*true' '$GLOBAL_CONFIG' 2>/dev/null"; then
+    return 0
+  fi
+  echo "file_monitor_disabled scenario=${scenario} label=${label}: file_monitor_enabled must be true for monitor record tests" >&2
+  adb_su "cat '$GLOBAL_CONFIG' 2>/dev/null || true" | sed 's/^/global_config: /' >&2
+  return 1
+}
+
 prepare_file_monitor_assertion() {
   local scenario="$1"
   local label="$2"
   echo "monitor_prepare scenario=${scenario} label=${label}"
+  assert_file_monitor_enabled_for_scenario "$scenario" "$label" || return 1
   adb logcat -c >/dev/null 2>&1 || true
   clear_file_monitor_log
   ensure_monitor_collector
@@ -1089,7 +1101,7 @@ run_file_monitor_write_success_case() {
   local file_name
   file_name="$(basename "$path")"
 
-  prepare_file_monitor_assertion "$scenario" "$label"
+  prepare_file_monitor_assertion "$scenario" "$label" || return 1
   run_write_case "$scenario" "$label" "$path" "$PAYLOAD" &&
     check_file_exists "scenario-${scenario}-${label}-expected" "$expected_path" &&
     { [ -z "$private_path" ] || check_file_missing "scenario-${scenario}-${label}-private" "$private_path"; } &&
@@ -1104,7 +1116,7 @@ run_file_monitor_write_denied_case() {
   local file_name
   file_name="$(basename "$path")"
 
-  prepare_file_monitor_assertion "$scenario" "$label"
+  prepare_file_monitor_assertion "$scenario" "$label" || return 1
   run_service_case "$scenario" "$label" "file_write_denied" '^PASS \[file_write_denied\]' --es file_path "$path" --es payload "$PAYLOAD" &&
     check_file_missing "scenario-${scenario}-${label}-missing" "$missing_path" &&
     expect_file_monitor_failure_record "$scenario" "$label" "$file_name"
@@ -1119,7 +1131,7 @@ run_file_monitor_mediastore_success_case() {
   local file_name
   file_name="$(monitor_file_name "$scenario" "$label")"
 
-  prepare_file_monitor_assertion "$scenario" "$label"
+  prepare_file_monitor_assertion "$scenario" "$label" || return 1
   run_mediastore_download_create_case "$scenario" "$label" "$file_name" "$relative_path" &&
     check_file_exists "scenario-${scenario}-${label}-expected" "$expected_path/$file_name" &&
     { [ -z "$private_path" ] || check_file_missing "scenario-${scenario}-${label}-private" "$private_path/$file_name"; } &&
@@ -1134,7 +1146,7 @@ run_file_monitor_mediastore_denied_case() {
   local file_name
   file_name="$(monitor_file_name "$scenario" "$label")"
 
-  prepare_file_monitor_assertion "$scenario" "$label"
+  prepare_file_monitor_assertion "$scenario" "$label" || return 1
   run_mediastore_download_create_denied_case "$scenario" "$label" "$file_name" "$relative_path" &&
     check_file_missing "scenario-${scenario}-${label}-missing" "$missing_path/$file_name" &&
     expect_file_monitor_failure_record "$scenario" "$label" "$file_name"
@@ -1144,7 +1156,8 @@ run_file_monitor_disabled_redirect_scenario() {
   local scenario="$1"
   local file_name
   file_name="$(monitor_file_name "$scenario" "disabled_regular")"
-  run_file_monitor_write_success_case "$scenario" "disabled-regular-write" "$MONITOR_BASE_ROOT/$file_name" "$MONITOR_BASE_ROOT/$file_name" "$PRIVATE_MONITOR_BASE_ROOT/$file_name"
+  run_file_monitor_write_success_case "$scenario" "disabled-regular-write" "$MONITOR_BASE_ROOT/$file_name" "$MONITOR_BASE_ROOT/$file_name" "$PRIVATE_MONITOR_BASE_ROOT/$file_name" &&
+    run_file_monitor_mediastore_success_case "$scenario" "disabled-system-writer-create" "Download/SrtMonitor" "$MONITOR_BASE_ROOT" "$PRIVATE_MONITOR_BASE_ROOT"
 }
 
 run_file_monitor_regular_scenario() {
@@ -1289,7 +1302,7 @@ run_scenario() {
       run_mount_namespace_mapping_read_only_scenario "$scenario"
       ;;
     23)
-      echo "step 5/7: 执行未启用重定向普通应用文件监视记录验证"
+      echo "step 5/7: 执行未启用重定向普通应用与系统代写文件监视记录验证"
       run_file_monitor_disabled_redirect_scenario "$scenario"
       ;;
     24|25)
@@ -1328,7 +1341,7 @@ fail=0
 build_scenario_list
 
 export APP_ID CONFIG GLOBAL_CONFIG LOG_PATH FILE_MONITOR_LOG_PATH ACTION RESULT_DIR INTERNAL_RESULT_DIR REAL_ROOT BACKEND_ROOT PRIVATE_ROOT BACKEND_PRIVATE_ROOT SANDBOX_RESULT_DIR TEST_FILE READ_ONLY_FILE ALLOW_KEEP_FILE ALLOW_PART_FILE QMARK_SINGLE_FILE QMARK_DOUBLE_FILE READ_ONLY_HARDLINK READ_ONLY_SYMLINK PAYLOAD READ_ONLY_PAYLOAD READ_ONLY_ROOT MAPPED_READ_ONLY_REQUEST MAPPED_READ_ONLY_TARGET ALLOW_ROOT PRIVATE_ALLOW_ROOT LEGACY_ROOT PRIVATE_LEGACY_ROOT QMARK_ROOT PRIVATE_QMARK_ROOT FUSE_PLAIN_ROOT PRIVATE_FUSE_PLAIN_ROOT FUSE_DCIM_ROOT PRIVATE_FUSE_DCIM_ROOT FUSE_DCIM_OTHER_ROOT PRIVATE_FUSE_DCIM_OTHER_ROOT FUSE_EXCLUDE_ROOT PRIVATE_FUSE_EXCLUDE_ROOT FUSE_MAP_PARENT FUSE_MAP_RW_REQUEST FUSE_MAP_RO_REQUEST FUSE_MAP_RW_TARGET FUSE_MAP_RO_TARGET FUSE_MULTI_ROOT PRIVATE_FUSE_MULTI_ROOT MOUNT_NS_ALLOW_ROOT PRIVATE_MOUNT_NS_ALLOW_ROOT MOUNT_NS_READ_ONLY_ROOT PRIVATE_MOUNT_NS_READ_ONLY_ROOT MOUNT_NS_MAP_PARENT MOUNT_NS_MAP_RW_REQUEST MOUNT_NS_MAP_RO_REQUEST MOUNT_NS_MAP_RW_TARGET MOUNT_NS_MAP_RO_TARGET MONITOR_BASE_ROOT PRIVATE_MONITOR_BASE_ROOT MONITOR_MAP_REQUEST MONITOR_MAP_TARGET MONITOR_LOCKED_ROOT MONITOR_WRITABLE_ROOT PRIVATE_MONITOR_WRITABLE_ROOT SRT_FRESH_APP_PER_CASE SRT_RESULT_POLL_MS SRT_APP_LAUNCH_SETTLE_MS SRT_MOUNT_CONFIRM_TIMEOUT_MS SRT_SERVICE_CASE_SETTLE_MS SRT_FILE_MONITOR_ENABLED
-export -f adb_root adb_su wait_boot_completed write_config write_global_config test_global_config enable_fuse_daemon_config disable_fuse_daemon_config use_mount_namespace_fallback_config apply_config target_path logical_dir expected_path scenario_title clean_targets clean_results latest_result wait_service_result wait_app_mount_confirmed prepare_service_case wait_storage_ready media_provider_query_ready wait_media_provider_ready print_storage_state run_service_case run_write_case run_create_case run_mediastore_download_create_case run_mediastore_download_create_denied_case run_write_test check_app_view expect_app_entry expect_no_app_entry find_written_file check_file_exists check_file_missing check_file_location seed_read_only_targets check_read_only_artifacts run_read_only_scenario prepare_mapped_read_only_targets run_mapped_read_only_scenario run_allow_exclusion_scenario run_legacy_exclusion_scenario run_qmark_wildcard_scenario check_fuse_daemon_started run_fuse_daemon_allow_wildcard_scenario run_fuse_daemon_read_only_exclusion_scenario run_fuse_daemon_mapping_read_only_scenario run_fuse_daemon_multi_wildcard_scenario set_mount_namespace_read_only_seed run_mount_namespace_allow_wildcard_fallback_scenario run_mount_namespace_read_only_wildcard_fallback_scenario run_mount_namespace_mapping_read_only_scenario ensure_monitor_collector clear_file_monitor_log prepare_file_monitor_assertion wait_file_monitor_log_line expect_file_monitor_success_record expect_file_monitor_failure_record monitor_file_name run_file_monitor_write_success_case run_file_monitor_write_denied_case run_file_monitor_mediastore_success_case run_file_monitor_mediastore_denied_case run_file_monitor_disabled_redirect_scenario run_file_monitor_regular_scenario run_file_monitor_mediastore_scenario check_health print_diagnostics run_standard_scenario run_scenario
+export -f adb_root adb_su wait_boot_completed write_config write_global_config test_global_config enable_fuse_daemon_config disable_fuse_daemon_config use_mount_namespace_fallback_config apply_config target_path logical_dir expected_path scenario_title clean_targets clean_results latest_result wait_service_result wait_app_mount_confirmed prepare_service_case wait_storage_ready media_provider_query_ready wait_media_provider_ready print_storage_state run_service_case run_write_case run_create_case run_mediastore_download_create_case run_mediastore_download_create_denied_case run_write_test check_app_view expect_app_entry expect_no_app_entry find_written_file check_file_exists check_file_missing check_file_location seed_read_only_targets check_read_only_artifacts run_read_only_scenario prepare_mapped_read_only_targets run_mapped_read_only_scenario run_allow_exclusion_scenario run_legacy_exclusion_scenario run_qmark_wildcard_scenario check_fuse_daemon_started run_fuse_daemon_allow_wildcard_scenario run_fuse_daemon_read_only_exclusion_scenario run_fuse_daemon_mapping_read_only_scenario run_fuse_daemon_multi_wildcard_scenario set_mount_namespace_read_only_seed run_mount_namespace_allow_wildcard_fallback_scenario run_mount_namespace_read_only_wildcard_fallback_scenario run_mount_namespace_mapping_read_only_scenario ensure_monitor_collector clear_file_monitor_log assert_file_monitor_enabled_for_scenario prepare_file_monitor_assertion wait_file_monitor_log_line expect_file_monitor_success_record expect_file_monitor_failure_record monitor_file_name run_file_monitor_write_success_case run_file_monitor_write_denied_case run_file_monitor_mediastore_success_case run_file_monitor_mediastore_denied_case run_file_monitor_disabled_redirect_scenario run_file_monitor_regular_scenario run_file_monitor_mediastore_scenario check_health print_diagnostics run_standard_scenario run_scenario
 
 for scenario in "${scenarios[@]}"; do
   echo "::group::scenario ${scenario}: $(scenario_title "$scenario")"

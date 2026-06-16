@@ -617,15 +617,29 @@ function Clear-FileMonitorLog {
     Invoke-Su "mkdir -p /data/adb/modules/storage.redirect.x/logs; : > '$FileMonitorLogPath'" | Out-Null
 }
 
+function Test-FileMonitorEnabledForScenario {
+    param([string]$Scenario, [string]$Label)
+    if (Test-Su "grep -Eq '""file_monitor_enabled""[[:space:]]*:[[:space:]]*true' '$GlobalConfig' 2>/dev/null") {
+        return $true
+    }
+    Write-Warning "file_monitor_disabled scenario=$Scenario label=$Label`: file_monitor_enabled must be true for monitor record tests"
+    @(Invoke-Su "cat '$GlobalConfig' 2>/dev/null || true") | ForEach-Object { Write-Host "  global_config: $_" }
+    return $false
+}
+
 function Prepare-FileMonitorAssertion {
     param([string]$Scenario, [string]$Label)
     Write-Host "  - monitor prepare $Scenario/$Label"
+    if (-not (Test-FileMonitorEnabledForScenario $Scenario $Label)) {
+        return $false
+    }
     Invoke-Adb @("logcat", "-c") | Out-Null
     Clear-FileMonitorLog
     Ensure-MonitorCollector
     if ($script:ServiceCaseSettleMilliseconds -gt 0) {
         Start-Sleep -Milliseconds $script:ServiceCaseSettleMilliseconds
     }
+    return $true
 }
 
 function Wait-FileMonitorLogLine {
@@ -670,7 +684,7 @@ function New-MonitorFileName {
 function Invoke-FileMonitorWriteSuccessCase {
     param([string]$Scenario, [string]$Label, [string]$Path, [string]$ExpectedPath, [string]$PrivatePath = "")
     $fileName = ($Path -split '/')[-1]
-    Prepare-FileMonitorAssertion $Scenario $Label
+    if (-not (Prepare-FileMonitorAssertion $Scenario $Label)) { return $false }
     $ok = (Invoke-WriteCase ([int]$Scenario) $Label $Path $Payload).Ok
     $ok = (Require-File "scenario-$Scenario" "$Label expected" $ExpectedPath) -and $ok
     if ($PrivatePath) {
@@ -684,7 +698,7 @@ function Invoke-FileMonitorWriteDeniedCase {
     param([string]$Scenario, [string]$Label, [string]$Path, [string]$MissingPath = "")
     $fileName = ($Path -split '/')[-1]
     if (-not $MissingPath) { $MissingPath = $Path }
-    Prepare-FileMonitorAssertion $Scenario $Label
+    if (-not (Prepare-FileMonitorAssertion $Scenario $Label)) { return $false }
     $ok = (Invoke-ServiceCase "scenario-$Scenario" $Label "file_write_denied" @{ file_path = $Path; payload = $Payload } "^PASS \[file_write_denied\]").Ok
     $ok = (Require-Missing "scenario-$Scenario" "$Label missing" $MissingPath) -and $ok
     $ok = (Wait-FileMonitorLogLine $Scenario $Label $fileName "failure") -and $ok
@@ -694,7 +708,7 @@ function Invoke-FileMonitorWriteDeniedCase {
 function Invoke-FileMonitorMediaStoreSuccessCase {
     param([string]$Scenario, [string]$Label, [string]$RelativePath, [string]$ExpectedPath, [string]$PrivatePath = "")
     $fileName = New-MonitorFileName $Scenario $Label
-    Prepare-FileMonitorAssertion $Scenario $Label
+    if (-not (Prepare-FileMonitorAssertion $Scenario $Label)) { return $false }
     $ok = (Invoke-MediaStoreDownloadCreateCase ([int]$Scenario) $Label $fileName $RelativePath).Ok
     $ok = (Require-File "scenario-$Scenario" "$Label expected" "$ExpectedPath/$fileName") -and $ok
     if ($PrivatePath) {
@@ -707,7 +721,7 @@ function Invoke-FileMonitorMediaStoreSuccessCase {
 function Invoke-FileMonitorMediaStoreDeniedCase {
     param([string]$Scenario, [string]$Label, [string]$RelativePath, [string]$MissingPath)
     $fileName = New-MonitorFileName $Scenario $Label
-    Prepare-FileMonitorAssertion $Scenario $Label
+    if (-not (Prepare-FileMonitorAssertion $Scenario $Label)) { return $false }
     $ok = (Invoke-MediaStoreDownloadCreateDeniedCase ([int]$Scenario) $Label $fileName $RelativePath).Ok
     $ok = (Require-Missing "scenario-$Scenario" "$Label missing" "$MissingPath/$fileName") -and $ok
     $ok = (Wait-FileMonitorLogLine $Scenario $Label $fileName "failure") -and $ok
@@ -717,7 +731,9 @@ function Invoke-FileMonitorMediaStoreDeniedCase {
 function Invoke-DisabledRedirectMonitorScenario {
     param([string]$Scenario)
     $fileName = "srt_monitor_${Scenario}_disabled_regular.bin"
-    Invoke-FileMonitorWriteSuccessCase $Scenario "disabled-regular-write" "$MonitorBaseRoot/$fileName" "$MonitorBaseRoot/$fileName" "$PrivateMonitorBaseRoot/$fileName"
+    $ok = Invoke-FileMonitorWriteSuccessCase $Scenario "disabled-regular-write" "$MonitorBaseRoot/$fileName" "$MonitorBaseRoot/$fileName" "$PrivateMonitorBaseRoot/$fileName"
+    $ok = (Invoke-FileMonitorMediaStoreSuccessCase $Scenario "disabled-system-writer-create" "Download/SrtMonitor" $MonitorBaseRoot $PrivateMonitorBaseRoot) -and $ok
+    $ok
 }
 
 function Invoke-RegularMonitorScenario {
@@ -826,7 +842,7 @@ function Get-ScenarioTitle {
         20 { "mount namespace allowed wildcard fallback" }
         21 { "mount namespace read_only wildcard fallback" }
         22 { "mount namespace mapped final target read-only policy" }
-        23 { "file monitor disabled redirect regular app success record" }
+        23 { "file monitor disabled redirect regular app and system writer success records" }
         24 { "file monitor regular app with fuse daemon off" }
         25 { "file monitor regular app with fuse daemon on" }
         26 { "file monitor system writer with fuse daemon off" }
