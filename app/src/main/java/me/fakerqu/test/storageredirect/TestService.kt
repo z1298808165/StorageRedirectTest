@@ -63,13 +63,8 @@ class TestService : Service() {
                     ?: File(filesDir, "test_case_result")
                 resultDir.mkdirs()
                 val resultFile = File(resultDir, "result_${System.currentTimeMillis()}.txt")
-                resultFile.bufferedWriter().use { writer ->
-                    results.forEach { result ->
-                        writer.write(result.toLogLine())
-                        writer.write("\n")
-                    }
-                    writer.flush()
-                }
+                writeResultFile(resultFile, results)
+                writeCurrentResultFile(resultDir, results)
 
                 if (failed > 0) {
                     Log.w(
@@ -133,11 +128,34 @@ class TestService : Service() {
     companion object {
         private const val CHANNEL_ID = "storage_redirect_test"
         private const val NOTIFICATION_ID = 10_000
+        private const val RESULT_CURRENT_FILE = "result_current.txt"
 
         fun createIntent(context: Context, broadcast: Intent): Intent =
             Intent(context, TestService::class.java).apply {
                 action = TestCaseReceiver.ACTION_TEST_CASE
                 TestCaseArgs.copyExtras(broadcast, this)
             }
+    }
+
+    private fun writeResultFile(file: File, results: List<TestResult>) {
+        file.bufferedWriter().use { writer ->
+            results.forEach { result ->
+                writer.write(result.toLogLine())
+                writer.write("\n")
+            }
+            writer.flush()
+        }
+    }
+
+    private fun writeCurrentResultFile(resultDir: File, results: List<TestResult>) {
+        val file = File(resultDir, RESULT_CURRENT_FILE)
+        val temp = File(resultDir, "$RESULT_CURRENT_FILE.tmp")
+        if (temp.exists()) temp.delete()
+        writeResultFile(temp, results)
+        if (file.exists()) file.delete()
+        if (!temp.renameTo(file)) {
+            writeResultFile(file, results)
+            temp.delete()
+        }
     }
 }
