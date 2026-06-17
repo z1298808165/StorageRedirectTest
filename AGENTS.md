@@ -12,6 +12,7 @@ C:\Users\12988\Desktop\srx_core
 - 本仓库测试 App 包名是 `me.fakerqu.test.storageredirect`。
 - 修改测试行为时，要考虑它是否仍能验证 `srx_core` 的文件重定向、路径映射、真实路径放行和 MediaStore hook 行为。
 - 新增 `srx_core` 功能回归时，优先沿用 `TestCase` + `TestService` + `.github/scripts/run-storage-redirect-scenarios.sh` 的现有结构；脚本中的设备侧断言要同时检查 App 视角和 root 视角的物理落点或拒绝结果。
+- 如果调整、新增或删除测试项、场景脚本、用例 id、参数语义或覆盖范围，除了更新本项目 README、脚本注释等说明，还必须同步更新 `C:\Users\12988\Desktop\srx_core\docs\device-testing.md`，保持两边测试文档一致。
 - 依赖、Gradle、JDK toolchain 下载优先使用国内镜像；不要无故把 `settings.gradle.kts`、`gradle/wrapper/gradle-wrapper.properties` 或 `gradle/gradle-daemon-jvm.properties` 改回海外源。
 - 文档和脚本说明要贴合当前代码，不要把旧的 `org.srx.testapp` 命令照搬进来。
 
