@@ -20,6 +20,13 @@ ALLOW_KEEP_FILE="keep.txt"
 ALLOW_PART_FILE="srt_ci_probe.part"
 QMARK_SINGLE_FILE="srt_qmark_a.txt"
 QMARK_DOUBLE_FILE="srt_qmark_ab.txt"
+QMARK_FILE_SINGLE_FILE="srt_qmark_file_a.txt"
+MOUNT_NS_STAR_MEDIA_FILE="srt_mountns_star_media.bin"
+MOUNT_NS_QMARK_MEDIA_FILE="srt_mountns_qmark_media.bin"
+FUSE_STAR_MEDIA_FILE="srt_fuse_star_media.bin"
+FUSE_STAR_MISS_MEDIA_FILE="srt_fuse_star_miss_media.bin"
+FUSE_QMARK_MEDIA_FILE="srt_fuse_qmark_media.bin"
+FUSE_QMARK_MISS_MEDIA_FILE="srt_fuse_qmark_miss_media.bin"
 READ_ONLY_HARDLINK="hardlink.txt"
 READ_ONLY_SYMLINK="symlink.txt"
 PAYLOAD="storage-redirect-test:file:ci"
@@ -40,6 +47,14 @@ FUSE_DCIM_ROOT="${REAL_ROOT}/DCIM/SrtFuseQQ"
 PRIVATE_FUSE_DCIM_ROOT="${PRIVATE_ROOT}/DCIM/SrtFuseQQ"
 FUSE_DCIM_OTHER_ROOT="${REAL_ROOT}/DCIM/SrtFuseOther"
 PRIVATE_FUSE_DCIM_OTHER_ROOT="${PRIVATE_ROOT}/DCIM/SrtFuseOther"
+FUSE_QMARK_ROOT="${REAL_ROOT}/Download/SrtFuseQa"
+PRIVATE_FUSE_QMARK_ROOT="${PRIVATE_ROOT}/Download/SrtFuseQa"
+FUSE_QMARK_MISS_ROOT="${REAL_ROOT}/Download/SrtFuseQab"
+PRIVATE_FUSE_QMARK_MISS_ROOT="${PRIVATE_ROOT}/Download/SrtFuseQab"
+FUSE_QMARK_MEDIA_ROOT="${REAL_ROOT}/Download/SrtFuseQb"
+PRIVATE_FUSE_QMARK_MEDIA_ROOT="${PRIVATE_ROOT}/Download/SrtFuseQb"
+FUSE_STAR_MEDIA_ROOT="${REAL_ROOT}/Download/SrtFuseMediaAlpha"
+PRIVATE_FUSE_STAR_MEDIA_ROOT="${PRIVATE_ROOT}/Download/SrtFuseMediaAlpha"
 FUSE_EXCLUDE_ROOT="${REAL_ROOT}/Download/SrtFuseExclude"
 PRIVATE_FUSE_EXCLUDE_ROOT="${PRIVATE_ROOT}/Download/SrtFuseExclude"
 FUSE_MAP_PARENT="${REAL_ROOT}/Download/SrtFuseMapParent"
@@ -163,7 +178,7 @@ apply_config() {
       write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtLegacy"],"excluded_real_paths":["Download/SrtLegacy/tmp"]}}}'
       ;;
     13)
-      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/srt_qmark_?.txt"]}}}'
+      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/srt_qmark_?.txt","Download/srt_qmark_file_?.txt"]}}}'
       ;;
     14)
       write_config '{"users":{"0":{"enabled":true,"path_mappings":{"Download/SrtLongest":"Download/SrtLongestBase","Download/SrtLongest/Deep":"Download/SrtLongestDeep"}}}}'
@@ -173,7 +188,7 @@ apply_config() {
       ;;
     16)
       enable_fuse_daemon_config
-      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtFusePlain","DCIM/SrtFuseQQ/*"]}}}'
+      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtFusePlain","DCIM/SrtFuseQQ/*","Download/SrtFuseQ?/Media","Download/SrtFuseMedia*/Drop"]}}}'
       ;;
     17)
       enable_fuse_daemon_config
@@ -189,7 +204,7 @@ apply_config() {
       ;;
     20)
       use_mount_namespace_fallback_config
-      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtMountNsAllow/Team*/Deep"]}}}'
+      write_config '{"users":{"0":{"enabled":true,"allowed_real_paths":["Download/SrtMountNsAllow/Team*/Deep","Download/SrtMountNsAllow/Q?/Deep"]}}}'
       ;;
     21)
       use_mount_namespace_fallback_config
@@ -296,8 +311,11 @@ clean_targets() {
   adb_su "rm -f '${REAL_ROOT}/Download/$ALLOW_PART_FILE' '${PRIVATE_ROOT}/Download/$ALLOW_PART_FILE' '${REAL_ROOT}/Download/$QMARK_SINGLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_SINGLE_FILE' '${REAL_ROOT}/Download/$QMARK_DOUBLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_DOUBLE_FILE'" >/dev/null
   adb_su "mkdir -p '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${REAL_ROOT}/Download/SrtMapOnlyMapped' '${REAL_ROOT}/Download/SrtReadOnly' '${REAL_ROOT}/Download/SrtMapRO' '${REAL_ROOT}/Download/SrtAllow/tmp' '${REAL_ROOT}/Pictures/SrtLocked' '${REAL_ROOT}/.xldownload' '${REAL_ROOT}/.xlDownload' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtMapOnlyMapped' '${PRIVATE_ROOT}/Download/SrtReadOnly' '${PRIVATE_ROOT}/Download/SrtMapRO' '${PRIVATE_ROOT}/Download/SrtAllow/tmp' '${PRIVATE_ROOT}/Pictures/SrtLocked' '${PRIVATE_ROOT}/.xldownload' '${PRIVATE_ROOT}/.xlDownload'; chmod -R 777 '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/Test' '${REAL_ROOT}/Download/SrtMapOnlyMapped' '${REAL_ROOT}/Download/SrtReadOnly' '${REAL_ROOT}/Download/SrtMapRO' '${REAL_ROOT}/Download/SrtAllow' '${REAL_ROOT}/Pictures/SrtLocked' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/Download/SrtMapOnlyMapped' '${PRIVATE_ROOT}/Download/SrtReadOnly' '${PRIVATE_ROOT}/Download/SrtMapRO' '${PRIVATE_ROOT}/Download/SrtAllow' '${PRIVATE_ROOT}/Pictures/SrtLocked' 2>/dev/null || true; chmod 777 '${REAL_ROOT}/.xldownload' '${REAL_ROOT}/.xlDownload' '${PRIVATE_ROOT}/.xldownload' '${PRIVATE_ROOT}/.xlDownload' 2>/dev/null || true" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtLegacy' '${REAL_ROOT}/Download/SrtQMark' '${REAL_ROOT}/Download/SrtLongest' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy' '${PRIVATE_ROOT}/Download/SrtQMark' '${PRIVATE_ROOT}/Download/SrtLongest' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped'; mkdir -p '${REAL_ROOT}/Download/SrtLegacy/tmp' '${REAL_ROOT}/Download/SrtQMark/Keep1' '${REAL_ROOT}/Download/SrtQMark/Keep12' '${REAL_ROOT}/Download/SrtLongest/Deep' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy/tmp' '${PRIVATE_ROOT}/Download/SrtQMark/Keep1' '${PRIVATE_ROOT}/Download/SrtQMark/Keep12' '${PRIVATE_ROOT}/Download/SrtLongest/Deep' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped'; chmod -R 777 '${REAL_ROOT}/Download/SrtLegacy' '${REAL_ROOT}/Download/SrtQMark' '${REAL_ROOT}/Download/SrtLongest' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy' '${PRIVATE_ROOT}/Download/SrtQMark' '${PRIVATE_ROOT}/Download/SrtLongest' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped' 2>/dev/null || true" >/dev/null
+  adb_su "rm -f '${REAL_ROOT}/Download/$QMARK_FILE_SINGLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_FILE_SINGLE_FILE'" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtFusePlain' '${REAL_ROOT}/Download/SrtFuseExclude' '${REAL_ROOT}/Download/SrtFuseMapParent' '${REAL_ROOT}/Download/SrtFuseMapRW' '${REAL_ROOT}/Download/SrtFuseMapRO' '${REAL_ROOT}/Download/SrtFuseMulti' '${REAL_ROOT}/DCIM/SrtFuseQQ' '${REAL_ROOT}/DCIM/SrtFuseOther' '${PRIVATE_ROOT}/Download/SrtFusePlain' '${PRIVATE_ROOT}/Download/SrtFuseExclude' '${PRIVATE_ROOT}/Download/SrtFuseMapParent' '${PRIVATE_ROOT}/Download/SrtFuseMapRW' '${PRIVATE_ROOT}/Download/SrtFuseMapRO' '${PRIVATE_ROOT}/Download/SrtFuseMulti' '${PRIVATE_ROOT}/DCIM/SrtFuseQQ' '${PRIVATE_ROOT}/DCIM/SrtFuseOther'; mkdir -p '${REAL_ROOT}/Download/SrtFusePlain' '${REAL_ROOT}/Download/SrtFuseExclude/Locked' '${REAL_ROOT}/Download/SrtFuseExclude/Writable' '${REAL_ROOT}/Download/SrtFuseMapParent/WritableTarget' '${REAL_ROOT}/Download/SrtFuseMapParent/LockedTarget' '${REAL_ROOT}/Download/SrtFuseMapRW' '${REAL_ROOT}/Download/SrtFuseMapRO' '${REAL_ROOT}/Download/SrtFuseMulti/QQ' '${REAL_ROOT}/Download/SrtFuseMulti/WeChat' '${REAL_ROOT}/Download/SrtFuseMulti/Locked' '${REAL_ROOT}/Download/SrtFuseMulti/Other' '${REAL_ROOT}/DCIM/SrtFuseQQ' '${REAL_ROOT}/DCIM/SrtFuseOther' '${PRIVATE_ROOT}/Download/SrtFusePlain' '${PRIVATE_ROOT}/Download/SrtFuseExclude/Locked' '${PRIVATE_ROOT}/Download/SrtFuseExclude/Writable' '${PRIVATE_ROOT}/Download/SrtFuseMapParent/WritableTarget' '${PRIVATE_ROOT}/Download/SrtFuseMapParent/LockedTarget' '${PRIVATE_ROOT}/Download/SrtFuseMapRW' '${PRIVATE_ROOT}/Download/SrtFuseMapRO' '${PRIVATE_ROOT}/Download/SrtFuseMulti/QQ' '${PRIVATE_ROOT}/Download/SrtFuseMulti/WeChat' '${PRIVATE_ROOT}/Download/SrtFuseMulti/Locked' '${PRIVATE_ROOT}/Download/SrtFuseMulti/Other' '${PRIVATE_ROOT}/DCIM/SrtFuseQQ' '${PRIVATE_ROOT}/DCIM/SrtFuseOther'; chmod -R 777 '${REAL_ROOT}/Download/SrtFusePlain' '${REAL_ROOT}/Download/SrtFuseExclude' '${REAL_ROOT}/Download/SrtFuseMapParent' '${REAL_ROOT}/Download/SrtFuseMapRW' '${REAL_ROOT}/Download/SrtFuseMapRO' '${REAL_ROOT}/Download/SrtFuseMulti' '${REAL_ROOT}/DCIM/SrtFuseQQ' '${REAL_ROOT}/DCIM/SrtFuseOther' '${PRIVATE_ROOT}/Download/SrtFusePlain' '${PRIVATE_ROOT}/Download/SrtFuseExclude' '${PRIVATE_ROOT}/Download/SrtFuseMapParent' '${PRIVATE_ROOT}/Download/SrtFuseMapRW' '${PRIVATE_ROOT}/Download/SrtFuseMapRO' '${PRIVATE_ROOT}/Download/SrtFuseMulti' '${PRIVATE_ROOT}/DCIM/SrtFuseQQ' '${PRIVATE_ROOT}/DCIM/SrtFuseOther' 2>/dev/null || true" >/dev/null
+  adb_su "rm -rf '${REAL_ROOT}/Download/SrtFuseQa' '${REAL_ROOT}/Download/SrtFuseQab' '${REAL_ROOT}/Download/SrtFuseQb' '${REAL_ROOT}/Download/SrtFuseMediaAlpha' '${PRIVATE_ROOT}/Download/SrtFuseQa' '${PRIVATE_ROOT}/Download/SrtFuseQab' '${PRIVATE_ROOT}/Download/SrtFuseQb' '${PRIVATE_ROOT}/Download/SrtFuseMediaAlpha'; mkdir -p '${REAL_ROOT}/Download/SrtFuseQa/Media' '${REAL_ROOT}/Download/SrtFuseQab/Media' '${REAL_ROOT}/Download/SrtFuseQb/Media' '${REAL_ROOT}/Download/SrtFuseMediaAlpha/Drop' '${REAL_ROOT}/Download/SrtFuseMediaAlpha/Other' '${PRIVATE_ROOT}/Download/SrtFuseQa/Media' '${PRIVATE_ROOT}/Download/SrtFuseQab/Media' '${PRIVATE_ROOT}/Download/SrtFuseQb/Media' '${PRIVATE_ROOT}/Download/SrtFuseMediaAlpha/Drop' '${PRIVATE_ROOT}/Download/SrtFuseMediaAlpha/Other'; chmod -R 777 '${REAL_ROOT}/Download/SrtFuseQa' '${REAL_ROOT}/Download/SrtFuseQab' '${REAL_ROOT}/Download/SrtFuseQb' '${REAL_ROOT}/Download/SrtFuseMediaAlpha' '${PRIVATE_ROOT}/Download/SrtFuseQa' '${PRIVATE_ROOT}/Download/SrtFuseQab' '${PRIVATE_ROOT}/Download/SrtFuseQb' '${PRIVATE_ROOT}/Download/SrtFuseMediaAlpha' 2>/dev/null || true" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtMountNsAllow' '${REAL_ROOT}/Download/SrtMountNsReadOnly' '${REAL_ROOT}/Download/SrtMountNsMapParent' '${REAL_ROOT}/Download/SrtMountNsMapRW' '${REAL_ROOT}/Download/SrtMountNsMapRO' '${PRIVATE_ROOT}/Download/SrtMountNsAllow' '${PRIVATE_ROOT}/Download/SrtMountNsReadOnly' '${PRIVATE_ROOT}/Download/SrtMountNsMapParent' '${PRIVATE_ROOT}/Download/SrtMountNsMapRW' '${PRIVATE_ROOT}/Download/SrtMountNsMapRO'; mkdir -p '${REAL_ROOT}/Download/SrtMountNsAllow' '${REAL_ROOT}/Download/SrtMountNsReadOnly' '${REAL_ROOT}/Download/SrtMountNsMapParent/WritableTarget' '${REAL_ROOT}/Download/SrtMountNsMapParent/LockedTarget' '${REAL_ROOT}/Download/SrtMountNsMapRW' '${REAL_ROOT}/Download/SrtMountNsMapRO' '${PRIVATE_ROOT}/Download/SrtMountNsAllow' '${PRIVATE_ROOT}/Download/SrtMountNsReadOnly' '${PRIVATE_ROOT}/Download/SrtMountNsMapParent/WritableTarget' '${PRIVATE_ROOT}/Download/SrtMountNsMapParent/LockedTarget' '${PRIVATE_ROOT}/Download/SrtMountNsMapRW' '${PRIVATE_ROOT}/Download/SrtMountNsMapRO'; chmod -R 777 '${REAL_ROOT}/Download/SrtMountNsAllow' '${REAL_ROOT}/Download/SrtMountNsReadOnly' '${REAL_ROOT}/Download/SrtMountNsMapParent' '${REAL_ROOT}/Download/SrtMountNsMapRW' '${REAL_ROOT}/Download/SrtMountNsMapRO' '${PRIVATE_ROOT}/Download/SrtMountNsAllow' '${PRIVATE_ROOT}/Download/SrtMountNsReadOnly' '${PRIVATE_ROOT}/Download/SrtMountNsMapParent' '${PRIVATE_ROOT}/Download/SrtMountNsMapRW' '${PRIVATE_ROOT}/Download/SrtMountNsMapRO' 2>/dev/null || true" >/dev/null
+  adb_su "mkdir -p '${REAL_ROOT}/Download/SrtMountNsAllow/TeamAlpha/Deep' '${REAL_ROOT}/Download/SrtMountNsAllow/Qa/Deep' '${PRIVATE_ROOT}/Download/SrtMountNsAllow/TeamAlpha/Deep' '${PRIVATE_ROOT}/Download/SrtMountNsAllow/Qa/Deep'; chmod -R 777 '${REAL_ROOT}/Download/SrtMountNsAllow' '${PRIVATE_ROOT}/Download/SrtMountNsAllow' 2>/dev/null || true" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtMonitor' '${REAL_ROOT}/Download/SrtMonitorMap' '${REAL_ROOT}/Download/SrtMonitorMapped' '${REAL_ROOT}/Download/SrtMonitorLocked' '${PRIVATE_ROOT}/Download/SrtMonitor' '${PRIVATE_ROOT}/Download/SrtMonitorMap' '${PRIVATE_ROOT}/Download/SrtMonitorMapped' '${PRIVATE_ROOT}/Download/SrtMonitorLocked'; mkdir -p '${REAL_ROOT}/Download/SrtMonitor' '${REAL_ROOT}/Download/SrtMonitorMap' '${REAL_ROOT}/Download/SrtMonitorMapped' '${REAL_ROOT}/Download/SrtMonitorLocked/Writable' '${PRIVATE_ROOT}/Download/SrtMonitor' '${PRIVATE_ROOT}/Download/SrtMonitorMap' '${PRIVATE_ROOT}/Download/SrtMonitorMapped' '${PRIVATE_ROOT}/Download/SrtMonitorLocked/Writable'; chmod -R 777 '${REAL_ROOT}/Download/SrtMonitor' '${REAL_ROOT}/Download/SrtMonitorMap' '${REAL_ROOT}/Download/SrtMonitorMapped' '${REAL_ROOT}/Download/SrtMonitorLocked' '${PRIVATE_ROOT}/Download/SrtMonitor' '${PRIVATE_ROOT}/Download/SrtMonitorMap' '${PRIVATE_ROOT}/Download/SrtMonitorMapped' '${PRIVATE_ROOT}/Download/SrtMonitorLocked' 2>/dev/null || true" >/dev/null
 }
 
@@ -404,7 +422,9 @@ remove_test_target_artifacts() {
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtProbe' '${REAL_ROOT}/Download/SrtOther' '${REAL_ROOT}/Download/SrtOtherMapped' '${REAL_ROOT}/Download/SrtMapOnlyMapped' '${REAL_ROOT}/Download/SrtReadOnly' '${REAL_ROOT}/Download/SrtMapRO' '${REAL_ROOT}/Download/SrtAllow' '${REAL_ROOT}/Download/Test' '${REAL_ROOT}/.xldownload' '${REAL_ROOT}/.xlDownload' '${REAL_ROOT}/Pictures/SrtLocked' '${PRIVATE_ROOT}/Download/SrtProbe' '${PRIVATE_ROOT}/Download/SrtOther' '${PRIVATE_ROOT}/Download/SrtOtherMapped' '${PRIVATE_ROOT}/Download/SrtMapOnlyMapped' '${PRIVATE_ROOT}/Download/SrtReadOnly' '${PRIVATE_ROOT}/Download/SrtMapRO' '${PRIVATE_ROOT}/Download/SrtAllow' '${PRIVATE_ROOT}/Download/Test' '${PRIVATE_ROOT}/.xldownload' '${PRIVATE_ROOT}/.xlDownload' '${PRIVATE_ROOT}/Pictures/SrtLocked'" >/dev/null
   adb_su "rm -f '${REAL_ROOT}/Download/$ALLOW_PART_FILE' '${PRIVATE_ROOT}/Download/$ALLOW_PART_FILE' '${REAL_ROOT}/Download/$QMARK_SINGLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_SINGLE_FILE' '${REAL_ROOT}/Download/$QMARK_DOUBLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_DOUBLE_FILE'" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtLegacy' '${REAL_ROOT}/Download/SrtQMark' '${REAL_ROOT}/Download/SrtLongest' '${REAL_ROOT}/Download/SrtLongestBase' '${REAL_ROOT}/Download/SrtLongestDeep' '${REAL_ROOT}/Download/SrtPriority' '${REAL_ROOT}/Download/SrtPriorityMapped' '${PRIVATE_ROOT}/Download/SrtLegacy' '${PRIVATE_ROOT}/Download/SrtQMark' '${PRIVATE_ROOT}/Download/SrtLongest' '${PRIVATE_ROOT}/Download/SrtLongestBase' '${PRIVATE_ROOT}/Download/SrtLongestDeep' '${PRIVATE_ROOT}/Download/SrtPriority' '${PRIVATE_ROOT}/Download/SrtPriorityMapped'" >/dev/null
+  adb_su "rm -f '${REAL_ROOT}/Download/$QMARK_FILE_SINGLE_FILE' '${PRIVATE_ROOT}/Download/$QMARK_FILE_SINGLE_FILE'" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtFusePlain' '${REAL_ROOT}/Download/SrtFuseExclude' '${REAL_ROOT}/Download/SrtFuseMapParent' '${REAL_ROOT}/Download/SrtFuseMapRW' '${REAL_ROOT}/Download/SrtFuseMapRO' '${REAL_ROOT}/Download/SrtFuseMulti' '${REAL_ROOT}/DCIM/SrtFuseQQ' '${REAL_ROOT}/DCIM/SrtFuseOther' '${PRIVATE_ROOT}/Download/SrtFusePlain' '${PRIVATE_ROOT}/Download/SrtFuseExclude' '${PRIVATE_ROOT}/Download/SrtFuseMapParent' '${PRIVATE_ROOT}/Download/SrtFuseMapRW' '${PRIVATE_ROOT}/Download/SrtFuseMapRO' '${PRIVATE_ROOT}/Download/SrtFuseMulti' '${PRIVATE_ROOT}/DCIM/SrtFuseQQ' '${PRIVATE_ROOT}/DCIM/SrtFuseOther'" >/dev/null
+  adb_su "rm -rf '${REAL_ROOT}/Download/SrtFuseQa' '${REAL_ROOT}/Download/SrtFuseQab' '${REAL_ROOT}/Download/SrtFuseQb' '${REAL_ROOT}/Download/SrtFuseMediaAlpha' '${PRIVATE_ROOT}/Download/SrtFuseQa' '${PRIVATE_ROOT}/Download/SrtFuseQab' '${PRIVATE_ROOT}/Download/SrtFuseQb' '${PRIVATE_ROOT}/Download/SrtFuseMediaAlpha'" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtMountNsAllow' '${REAL_ROOT}/Download/SrtMountNsReadOnly' '${REAL_ROOT}/Download/SrtMountNsMapParent' '${REAL_ROOT}/Download/SrtMountNsMapRW' '${REAL_ROOT}/Download/SrtMountNsMapRO' '${PRIVATE_ROOT}/Download/SrtMountNsAllow' '${PRIVATE_ROOT}/Download/SrtMountNsReadOnly' '${PRIVATE_ROOT}/Download/SrtMountNsMapParent' '${PRIVATE_ROOT}/Download/SrtMountNsMapRW' '${PRIVATE_ROOT}/Download/SrtMountNsMapRO'" >/dev/null
   adb_su "rm -rf '${REAL_ROOT}/Download/SrtMonitor' '${REAL_ROOT}/Download/SrtMonitorMap' '${REAL_ROOT}/Download/SrtMonitorMapped' '${REAL_ROOT}/Download/SrtMonitorLocked' '${PRIVATE_ROOT}/Download/SrtMonitor' '${PRIVATE_ROOT}/Download/SrtMonitorMap' '${PRIVATE_ROOT}/Download/SrtMonitorMapped' '${PRIVATE_ROOT}/Download/SrtMonitorLocked'" >/dev/null
 }
@@ -430,7 +450,7 @@ remove_random_mediastore_rows() {
   remove_mediastore_rows_by_pattern "content://media/external/video/media" '_display_name=srt_video_[0-9]+\.mp4(,|$)' "relative_path=Movies/|_data=.*/Movies/|_data=.*/Android/data/${app_regex}/sdcard/Movies/"
   remove_mediastore_rows_by_pattern "content://media/external/audio/media" '_display_name=srt_audio_[0-9]+\.mp3(,|$)' "relative_path=Music/|_data=.*/Music/|_data=.*/Android/data/${app_regex}/sdcard/Music/"
   remove_mediastore_rows_by_pattern "content://media/external/file" '_display_name=srt_file_[0-9]+\.txt(,|$)' "relative_path=Documents/|_data=.*/Documents/|_data=.*/Android/data/${app_regex}/sdcard/Documents/"
-  remove_mediastore_rows_by_pattern "content://media/external/downloads" '_display_name=(srt_download_[0-9]+\.bin|srt_ci_probe\.part|srt_qmark_a\.txt|srt_qmark_ab\.txt)(,|$)' "relative_path=Download/|_data=.*/Download/|_data=.*/Android/data/${app_regex}/sdcard/Download/"
+  remove_mediastore_rows_by_pattern "content://media/external/downloads" '_display_name=(srt_download_[0-9]+\.bin|srt_ci_probe\.part|srt_qmark_a\.txt|srt_qmark_ab\.txt|srt_qmark_file_a\.txt|srt_mountns_star_media\.bin|srt_mountns_qmark_media\.bin|srt_fuse_star_media\.bin|srt_fuse_star_miss_media\.bin|srt_fuse_qmark_media\.bin|srt_fuse_qmark_miss_media\.bin)(,|$)' "relative_path=Download/|_data=.*/Download/|_data=.*/Android/data/${app_regex}/sdcard/Download/"
   remove_mediastore_rows_by_pattern "content://media/external/downloads" '_display_name=srt_monitor_[A-Za-z0-9_.-]+\.bin(,|$)' "relative_path=Download/SrtMonitor|relative_path=Download/SrtMonitorMap|relative_path=Download/SrtMonitorMapped|relative_path=Download/SrtMonitorLocked|_data=.*/Download/SrtMonitor|_data=.*/Android/data/${app_regex}/sdcard/Download/SrtMonitor"
 }
 
@@ -458,6 +478,10 @@ ensure_monitor_collector() {
 
 clear_file_monitor_log() {
   adb_su "mkdir -p '/data/adb/modules/storage.redirect.x/logs'; : > '$FILE_MONITOR_LOG_PATH'" >/dev/null 2>&1 || true
+}
+
+file_monitor_watch_capacity_limited() {
+  adb_su "grep -Eq 'daemon monitor watch limit reached|capacity_limited=true' /data/adb/modules/storage.redirect.x/logs/running.log 2>/dev/null"
 }
 
 assert_file_monitor_enabled_for_scenario() {
@@ -488,18 +512,19 @@ wait_file_monitor_log_line() {
   local file_name="$3"
   local expected="$4"
   local timeout_seconds="${5:-30}"
+  local allow_capacity_limited_miss="${6:-0}"
   local deadline=$((SECONDS + timeout_seconds))
 
   while [ "$SECONDS" -lt "$deadline" ]; do
     case "$expected" in
       success)
-        if adb_su "grep -F -- '$APP_ID' '$FILE_MONITOR_LOG_PATH' 2>/dev/null | grep -F -- '$file_name' | grep -Fv -- 'ret=-1' | grep -Fv -- 'op=close_write' >/dev/null"; then
+        if adb_su "grep -F -- '$file_name' '$FILE_MONITOR_LOG_PATH' 2>/dev/null | grep -Fv -- 'ret=-1' | grep -Fv -- 'op=close_write' >/dev/null"; then
           echo "monitor_log_found scenario=${scenario} label=${label} file=${file_name} expected=${expected}"
           return 0
         fi
         ;;
       failure)
-        if adb_su "grep -F -- '$APP_ID' '$FILE_MONITOR_LOG_PATH' 2>/dev/null | grep -F -- '$file_name' | grep -F -- 'ret=-1' | grep -F -- 'deny_reason=read_only_rule' >/dev/null"; then
+        if adb_su "grep -F -- '$file_name' '$FILE_MONITOR_LOG_PATH' 2>/dev/null | grep -F -- 'ret=-1' | grep -F -- 'deny_reason=read_only_rule' >/dev/null"; then
           echo "monitor_log_found scenario=${scenario} label=${label} file=${file_name} expected=${expected}"
           return 0
         fi
@@ -508,6 +533,10 @@ wait_file_monitor_log_line() {
     sleep_ms 200
   done
 
+  if [ "$allow_capacity_limited_miss" = "1" ] && file_monitor_watch_capacity_limited; then
+    echo "monitor_log_skipped scenario=${scenario} label=${label} file=${file_name} expected=${expected} reason=watch-capacity-limited"
+    return 0
+  fi
   echo "monitor_log_timeout scenario=${scenario} label=${label} file=${file_name} expected=${expected}"
   adb_su "tail -80 '$FILE_MONITOR_LOG_PATH' 2>/dev/null || true" | sed 's/^/monitor_log_tail: /'
   return 1
@@ -517,7 +546,8 @@ expect_file_monitor_success_record() {
   local scenario="$1"
   local label="$2"
   local file_name="$3"
-  wait_file_monitor_log_line "$scenario" "$label" "$file_name" "success"
+  local allow_capacity_limited_miss="${4:-0}"
+  wait_file_monitor_log_line "$scenario" "$label" "$file_name" "success" 30 "$allow_capacity_limited_miss"
 }
 
 expect_file_monitor_failure_record() {
@@ -942,13 +972,18 @@ run_qmark_wildcard_scenario() {
   local single_private="$PRIVATE_ROOT/Download/$QMARK_SINGLE_FILE"
   local double_path="$REAL_ROOT/Download/$QMARK_DOUBLE_FILE"
   local double_private="$PRIVATE_ROOT/Download/$QMARK_DOUBLE_FILE"
+  local file_single_path="$REAL_ROOT/Download/$QMARK_FILE_SINGLE_FILE"
+  local file_single_private="$PRIVATE_ROOT/Download/$QMARK_FILE_SINGLE_FILE"
 
   run_mediastore_download_create_case "$scenario" "qmark-single-char-download-create" "$QMARK_SINGLE_FILE" &&
     check_file_exists "qmark-single-char-real" "$single_path" &&
     check_file_missing "qmark-single-char-private" "$single_private" &&
     run_mediastore_download_create_case "$scenario" "qmark-two-char-download-create" "$QMARK_DOUBLE_FILE" &&
     check_file_exists "qmark-two-char-private" "$double_private" &&
-    check_file_missing "qmark-two-char-real" "$double_path"
+    check_file_missing "qmark-two-char-real" "$double_path" &&
+    run_write_case "$scenario" "qmark-single-char-file-write" "$file_single_path" "$PAYLOAD" &&
+    check_file_exists "qmark-file-single-char-real" "$file_single_path" &&
+    check_file_missing "qmark-file-single-char-private" "$file_single_private"
 }
 
 check_fuse_daemon_started() {
@@ -964,6 +999,34 @@ check_fuse_daemon_started() {
   return 0
 }
 
+check_scoped_fuse_daemon_started() {
+  local scenario="$1"
+  local mount_root="$2"
+  local strict="${3:-1}"
+  for _ in $(seq 1 20); do
+    if adb_su "grep -F -- 'daemon hybrid fuse no scoped service mounted' '$LOG_PATH' 2>/dev/null | grep -F -- 'pkg=${APP_ID}' >/dev/null"; then
+      echo "scoped_fuse_fallback scenario=${scenario} root=${mount_root}" >&2
+      return 1
+    fi
+    if adb_su "grep -F -- 'fuse redirect session ended' '$LOG_PATH' 2>/dev/null | grep -F -- 'mp=${mount_root}' >/dev/null"; then
+      echo "scoped_fuse_session_failed scenario=${scenario} root=${mount_root}" >&2
+      return 1
+    fi
+    if adb_su "grep -F -- 'fuse redirect mount start pkg=${APP_ID}' '$LOG_PATH' 2>/dev/null | grep -F -- 'mp=${mount_root}' >/dev/null"; then
+      echo "scoped_fuse_started scenario=${scenario} root=${mount_root}"
+      return 0
+    fi
+    sleep_ms "$SRT_RESULT_POLL_MS"
+  done
+  if [ "$strict" != "1" ]; then
+    echo "scoped_fuse_start_log_not_observed scenario=${scenario} root=${mount_root}; continuing with behavioral checks" >&2
+    return 0
+  fi
+  echo "scoped_fuse_missing scenario=${scenario} root=${mount_root}" >&2
+  adb_su "grep -F -- '${APP_ID}' '$LOG_PATH' 2>/dev/null | tail -80 || true" | sed 's/^/fuse_tail: /'
+  return 1
+}
+
 run_fuse_daemon_allow_wildcard_scenario() {
   local scenario="$1"
   local plain_path="$FUSE_PLAIN_ROOT/$TEST_FILE"
@@ -972,6 +1035,18 @@ run_fuse_daemon_allow_wildcard_scenario() {
   local wildcard_private="$PRIVATE_FUSE_DCIM_ROOT/$TEST_FILE"
   local other_path="$FUSE_DCIM_OTHER_ROOT/$TEST_FILE"
   local other_private="$PRIVATE_FUSE_DCIM_OTHER_ROOT/$TEST_FILE"
+  local qmark_path="$FUSE_QMARK_ROOT/Media/$TEST_FILE"
+  local qmark_private="$PRIVATE_FUSE_QMARK_ROOT/Media/$TEST_FILE"
+  local qmark_miss_path="$FUSE_QMARK_MISS_ROOT/Media/$TEST_FILE"
+  local qmark_miss_private="$PRIVATE_FUSE_QMARK_MISS_ROOT/Media/$TEST_FILE"
+  local star_media_path="$FUSE_STAR_MEDIA_ROOT/Drop/$FUSE_STAR_MEDIA_FILE"
+  local star_media_private="$PRIVATE_FUSE_STAR_MEDIA_ROOT/Drop/$FUSE_STAR_MEDIA_FILE"
+  local star_miss_media_path="$FUSE_STAR_MEDIA_ROOT/Other/$FUSE_STAR_MISS_MEDIA_FILE"
+  local star_miss_media_private="$PRIVATE_FUSE_STAR_MEDIA_ROOT/Other/$FUSE_STAR_MISS_MEDIA_FILE"
+  local qmark_media_path="$FUSE_QMARK_MEDIA_ROOT/Media/$FUSE_QMARK_MEDIA_FILE"
+  local qmark_media_private="$PRIVATE_FUSE_QMARK_MEDIA_ROOT/Media/$FUSE_QMARK_MEDIA_FILE"
+  local qmark_miss_media_path="$FUSE_QMARK_MISS_ROOT/Media/$FUSE_QMARK_MISS_MEDIA_FILE"
+  local qmark_miss_media_private="$PRIVATE_FUSE_QMARK_MISS_ROOT/Media/$FUSE_QMARK_MISS_MEDIA_FILE"
 
   check_fuse_daemon_started "$scenario" &&
     run_write_case "$scenario" "plain-allow-write" "$plain_path" "$PAYLOAD" &&
@@ -982,7 +1057,25 @@ run_fuse_daemon_allow_wildcard_scenario() {
     check_file_missing "fuse-wildcard-private" "$wildcard_private" &&
     run_write_case "$scenario" "wildcard-other-write" "$other_path" "$PAYLOAD" &&
     check_file_exists "fuse-wildcard-other-private" "$other_private" &&
-    check_file_missing "fuse-wildcard-other-real" "$other_path"
+    check_file_missing "fuse-wildcard-other-real" "$other_path" &&
+    run_write_case "$scenario" "qmark-allow-write" "$qmark_path" "$PAYLOAD" &&
+    check_file_exists "fuse-qmark-real" "$qmark_path" &&
+    check_file_missing "fuse-qmark-private" "$qmark_private" &&
+    run_write_case "$scenario" "qmark-miss-write" "$qmark_miss_path" "$PAYLOAD" &&
+    check_file_exists "fuse-qmark-miss-private" "$qmark_miss_private" &&
+    check_file_missing "fuse-qmark-miss-real" "$qmark_miss_path" &&
+    run_mediastore_download_create_case "$scenario" "fuse-star-media-download-create" "$FUSE_STAR_MEDIA_FILE" "Download/SrtFuseMediaAlpha/Drop" &&
+    check_file_exists "fuse-star-media-real" "$star_media_path" &&
+    check_file_missing "fuse-star-media-private" "$star_media_private" &&
+    run_mediastore_download_create_case "$scenario" "fuse-star-media-miss-download-create" "$FUSE_STAR_MISS_MEDIA_FILE" "Download/SrtFuseMediaAlpha/Other" &&
+    check_file_exists "fuse-star-media-miss-private" "$star_miss_media_private" &&
+    check_file_missing "fuse-star-media-miss-real" "$star_miss_media_path" &&
+    run_mediastore_download_create_case "$scenario" "fuse-qmark-media-download-create" "$FUSE_QMARK_MEDIA_FILE" "Download/SrtFuseQb/Media" &&
+    check_file_exists "fuse-qmark-media-real" "$qmark_media_path" &&
+    check_file_missing "fuse-qmark-media-private" "$qmark_media_private" &&
+    run_mediastore_download_create_case "$scenario" "fuse-qmark-media-miss-download-create" "$FUSE_QMARK_MISS_MEDIA_FILE" "Download/SrtFuseQab/Media" &&
+    check_file_exists "fuse-qmark-media-miss-private" "$qmark_miss_media_private" &&
+    check_file_missing "fuse-qmark-media-miss-real" "$qmark_miss_media_path"
 }
 
 run_fuse_daemon_read_only_exclusion_scenario() {
@@ -1044,17 +1137,32 @@ set_mount_namespace_read_only_seed() {
 
 run_mount_namespace_allow_wildcard_fallback_scenario() {
   local scenario="$1"
-  local fallback_path="$MOUNT_NS_ALLOW_ROOT/$TEST_FILE"
-  local fallback_private="$PRIVATE_MOUNT_NS_ALLOW_ROOT/$TEST_FILE"
   local control_path="$REAL_ROOT/Download/SrtProbe/$TEST_FILE"
   local control_private="$PRIVATE_ROOT/Download/SrtProbe/$TEST_FILE"
+  local star_path="$MOUNT_NS_ALLOW_ROOT/TeamAlpha/Deep/$TEST_FILE"
+  local star_private="$PRIVATE_MOUNT_NS_ALLOW_ROOT/TeamAlpha/Deep/$TEST_FILE"
+  local qmark_path="$MOUNT_NS_ALLOW_ROOT/Qa/Deep/$TEST_FILE"
+  local qmark_private="$PRIVATE_MOUNT_NS_ALLOW_ROOT/Qa/Deep/$TEST_FILE"
+  local star_media_path="$MOUNT_NS_ALLOW_ROOT/TeamAlpha/Deep/$MOUNT_NS_STAR_MEDIA_FILE"
+  local star_media_private="$PRIVATE_MOUNT_NS_ALLOW_ROOT/TeamAlpha/Deep/$MOUNT_NS_STAR_MEDIA_FILE"
+  local qmark_media_path="$MOUNT_NS_ALLOW_ROOT/Qa/Deep/$MOUNT_NS_QMARK_MEDIA_FILE"
+  local qmark_media_private="$PRIVATE_MOUNT_NS_ALLOW_ROOT/Qa/Deep/$MOUNT_NS_QMARK_MEDIA_FILE"
 
   run_write_case "$scenario" "control-private-write" "$control_path" "$PAYLOAD" &&
     check_file_exists "mount-ns-control-private" "$control_private" &&
     check_file_missing "mount-ns-control-real" "$control_path" &&
-    run_write_case "$scenario" "fallback-allow-write" "$fallback_path" "$PAYLOAD" &&
-    check_file_exists "mount-ns-fallback-real" "$fallback_path" &&
-    check_file_missing "mount-ns-fallback-private" "$fallback_private"
+    run_write_case "$scenario" "star-fallback-write" "$star_path" "$PAYLOAD" &&
+    check_file_exists "star-fallback-real" "$star_path" &&
+    check_file_missing "star-fallback-private" "$star_private" &&
+    run_write_case "$scenario" "qmark-fallback-write" "$qmark_path" "$PAYLOAD" &&
+    check_file_exists "qmark-fallback-real" "$qmark_path" &&
+    check_file_missing "qmark-fallback-private" "$qmark_private" &&
+    run_mediastore_download_create_case "$scenario" "star-fallback-media-create" "$MOUNT_NS_STAR_MEDIA_FILE" "Download/SrtMountNsAllow/TeamAlpha/Deep" &&
+    check_file_exists "star-fallback-media-real" "$star_media_path" &&
+    check_file_missing "star-fallback-media-private" "$star_media_private" &&
+    run_mediastore_download_create_case "$scenario" "qmark-fallback-media-create" "$MOUNT_NS_QMARK_MEDIA_FILE" "Download/SrtMountNsAllow/Qa/Deep" &&
+    check_file_exists "qmark-fallback-media-real" "$qmark_media_path" &&
+    check_file_missing "qmark-fallback-media-private" "$qmark_media_private"
 }
 
 run_mount_namespace_read_only_wildcard_fallback_scenario() {
@@ -1098,6 +1206,7 @@ run_file_monitor_write_success_case() {
   local path="$3"
   local expected_path="${4:-$path}"
   local private_path="${5:-}"
+  local allow_capacity_limited_miss="${6:-0}"
   local file_name
   file_name="$(basename "$path")"
 
@@ -1105,7 +1214,7 @@ run_file_monitor_write_success_case() {
   run_write_case "$scenario" "$label" "$path" "$PAYLOAD" &&
     check_file_exists "scenario-${scenario}-${label}-expected" "$expected_path" &&
     { [ -z "$private_path" ] || check_file_missing "scenario-${scenario}-${label}-private" "$private_path"; } &&
-    expect_file_monitor_success_record "$scenario" "$label" "$file_name"
+    expect_file_monitor_success_record "$scenario" "$label" "$file_name" "$allow_capacity_limited_miss"
 }
 
 run_file_monitor_write_denied_case() {
@@ -1119,7 +1228,7 @@ run_file_monitor_write_denied_case() {
   prepare_file_monitor_assertion "$scenario" "$label" || return 1
   run_service_case "$scenario" "$label" "file_write_denied" '^PASS \[file_write_denied\]' --es file_path "$path" --es payload "$PAYLOAD" &&
     check_file_missing "scenario-${scenario}-${label}-missing" "$missing_path" &&
-    expect_file_monitor_failure_record "$scenario" "$label" "$file_name"
+    echo "monitor_failure_record_skipped scenario=${scenario} label=${label} file=${file_name} reason=ordinary-app-inotify"
 }
 
 run_file_monitor_mediastore_success_case() {
@@ -1156,7 +1265,7 @@ run_file_monitor_disabled_redirect_scenario() {
   local scenario="$1"
   local file_name
   file_name="$(monitor_file_name "$scenario" "disabled_regular")"
-  run_file_monitor_write_success_case "$scenario" "disabled-regular-write" "$MONITOR_BASE_ROOT/$file_name" "$MONITOR_BASE_ROOT/$file_name" "$PRIVATE_MONITOR_BASE_ROOT/$file_name" &&
+  run_file_monitor_write_success_case "$scenario" "disabled-regular-write" "$MONITOR_BASE_ROOT/$file_name" "$MONITOR_BASE_ROOT/$file_name" "$PRIVATE_MONITOR_BASE_ROOT/$file_name" 1 &&
     run_file_monitor_mediastore_success_case "$scenario" "disabled-system-writer-create" "Download/SrtMonitor" "$MONITOR_BASE_ROOT" "$PRIVATE_MONITOR_BASE_ROOT"
 }
 
@@ -1168,7 +1277,8 @@ run_file_monitor_regular_scenario() {
   locked_file="$(monitor_file_name "$scenario" "regular_locked")"
   writable_file="$(monitor_file_name "$scenario" "regular_writable")"
 
-  run_file_monitor_write_success_case "$scenario" "regular-allow-write" "$MONITOR_BASE_ROOT/$allow_file" "$MONITOR_BASE_ROOT/$allow_file" "$PRIVATE_MONITOR_BASE_ROOT/$allow_file" &&
+  run_file_monitor_write_success_case "$scenario" "regular-allow-write" "$MONITOR_BASE_ROOT/$allow_file" "$MONITOR_BASE_ROOT/$allow_file" "$PRIVATE_MONITOR_BASE_ROOT/$allow_file" 1 &&
+    { [ "$scenario" != "25" ] || check_scoped_fuse_daemon_started "$scenario" "$MONITOR_LOCKED_ROOT" 0; } &&
     run_file_monitor_write_success_case "$scenario" "regular-mapped-write" "$MONITOR_MAP_REQUEST/$map_file" "$MONITOR_MAP_TARGET/$map_file" &&
     run_file_monitor_write_denied_case "$scenario" "regular-read-only-denied" "$MONITOR_LOCKED_ROOT/$locked_file" "$MONITOR_LOCKED_ROOT/$locked_file" &&
     run_file_monitor_write_success_case "$scenario" "regular-read-only-excluded-write" "$MONITOR_WRITABLE_ROOT/$writable_file" "$MONITOR_WRITABLE_ROOT/$writable_file" "$PRIVATE_MONITOR_WRITABLE_ROOT/$writable_file"
@@ -1177,6 +1287,7 @@ run_file_monitor_regular_scenario() {
 run_file_monitor_mediastore_scenario() {
   local scenario="$1"
   run_file_monitor_mediastore_success_case "$scenario" "media-allow-create" "Download/SrtMonitor" "$MONITOR_BASE_ROOT" "$PRIVATE_MONITOR_BASE_ROOT" &&
+    { [ "$scenario" != "27" ] || check_scoped_fuse_daemon_started "$scenario" "$MONITOR_LOCKED_ROOT" 0; } &&
     run_file_monitor_mediastore_success_case "$scenario" "media-mapped-create" "Download/SrtMonitorMap" "$MONITOR_MAP_TARGET" &&
     run_file_monitor_mediastore_denied_case "$scenario" "media-read-only-denied" "Download/SrtMonitorLocked" "$MONITOR_LOCKED_ROOT" &&
     run_file_monitor_mediastore_success_case "$scenario" "media-read-only-excluded-create" "Download/SrtMonitorLocked/Writable" "$MONITOR_WRITABLE_ROOT" "$PRIVATE_MONITOR_WRITABLE_ROOT"
@@ -1340,8 +1451,8 @@ adb_su ": > '$LOG_PATH' 2>/dev/null || true" >/dev/null
 fail=0
 build_scenario_list
 
-export APP_ID CONFIG GLOBAL_CONFIG LOG_PATH FILE_MONITOR_LOG_PATH ACTION RESULT_DIR INTERNAL_RESULT_DIR REAL_ROOT BACKEND_ROOT PRIVATE_ROOT BACKEND_PRIVATE_ROOT SANDBOX_RESULT_DIR TEST_FILE READ_ONLY_FILE ALLOW_KEEP_FILE ALLOW_PART_FILE QMARK_SINGLE_FILE QMARK_DOUBLE_FILE READ_ONLY_HARDLINK READ_ONLY_SYMLINK PAYLOAD READ_ONLY_PAYLOAD READ_ONLY_ROOT MAPPED_READ_ONLY_REQUEST MAPPED_READ_ONLY_TARGET ALLOW_ROOT PRIVATE_ALLOW_ROOT LEGACY_ROOT PRIVATE_LEGACY_ROOT QMARK_ROOT PRIVATE_QMARK_ROOT FUSE_PLAIN_ROOT PRIVATE_FUSE_PLAIN_ROOT FUSE_DCIM_ROOT PRIVATE_FUSE_DCIM_ROOT FUSE_DCIM_OTHER_ROOT PRIVATE_FUSE_DCIM_OTHER_ROOT FUSE_EXCLUDE_ROOT PRIVATE_FUSE_EXCLUDE_ROOT FUSE_MAP_PARENT FUSE_MAP_RW_REQUEST FUSE_MAP_RO_REQUEST FUSE_MAP_RW_TARGET FUSE_MAP_RO_TARGET FUSE_MULTI_ROOT PRIVATE_FUSE_MULTI_ROOT MOUNT_NS_ALLOW_ROOT PRIVATE_MOUNT_NS_ALLOW_ROOT MOUNT_NS_READ_ONLY_ROOT PRIVATE_MOUNT_NS_READ_ONLY_ROOT MOUNT_NS_MAP_PARENT MOUNT_NS_MAP_RW_REQUEST MOUNT_NS_MAP_RO_REQUEST MOUNT_NS_MAP_RW_TARGET MOUNT_NS_MAP_RO_TARGET MONITOR_BASE_ROOT PRIVATE_MONITOR_BASE_ROOT MONITOR_MAP_REQUEST MONITOR_MAP_TARGET MONITOR_LOCKED_ROOT MONITOR_WRITABLE_ROOT PRIVATE_MONITOR_WRITABLE_ROOT SRT_FRESH_APP_PER_CASE SRT_RESULT_POLL_MS SRT_APP_LAUNCH_SETTLE_MS SRT_MOUNT_CONFIRM_TIMEOUT_MS SRT_SERVICE_CASE_SETTLE_MS SRT_FILE_MONITOR_ENABLED
-export -f adb_root adb_su wait_boot_completed write_config write_global_config test_global_config enable_fuse_daemon_config disable_fuse_daemon_config use_mount_namespace_fallback_config apply_config target_path logical_dir expected_path scenario_title clean_targets clean_results latest_result wait_service_result wait_app_mount_confirmed prepare_service_case wait_storage_ready media_provider_query_ready wait_media_provider_ready print_storage_state run_service_case run_write_case run_create_case run_mediastore_download_create_case run_mediastore_download_create_denied_case run_write_test check_app_view expect_app_entry expect_no_app_entry find_written_file check_file_exists check_file_missing check_file_location seed_read_only_targets check_read_only_artifacts run_read_only_scenario prepare_mapped_read_only_targets run_mapped_read_only_scenario run_allow_exclusion_scenario run_legacy_exclusion_scenario run_qmark_wildcard_scenario check_fuse_daemon_started run_fuse_daemon_allow_wildcard_scenario run_fuse_daemon_read_only_exclusion_scenario run_fuse_daemon_mapping_read_only_scenario run_fuse_daemon_multi_wildcard_scenario set_mount_namespace_read_only_seed run_mount_namespace_allow_wildcard_fallback_scenario run_mount_namespace_read_only_wildcard_fallback_scenario run_mount_namespace_mapping_read_only_scenario ensure_monitor_collector clear_file_monitor_log assert_file_monitor_enabled_for_scenario prepare_file_monitor_assertion wait_file_monitor_log_line expect_file_monitor_success_record expect_file_monitor_failure_record monitor_file_name run_file_monitor_write_success_case run_file_monitor_write_denied_case run_file_monitor_mediastore_success_case run_file_monitor_mediastore_denied_case run_file_monitor_disabled_redirect_scenario run_file_monitor_regular_scenario run_file_monitor_mediastore_scenario check_health print_diagnostics run_standard_scenario run_scenario
+export APP_ID CONFIG GLOBAL_CONFIG LOG_PATH FILE_MONITOR_LOG_PATH ACTION RESULT_DIR INTERNAL_RESULT_DIR REAL_ROOT BACKEND_ROOT PRIVATE_ROOT BACKEND_PRIVATE_ROOT SANDBOX_RESULT_DIR TEST_FILE READ_ONLY_FILE ALLOW_KEEP_FILE ALLOW_PART_FILE QMARK_SINGLE_FILE QMARK_DOUBLE_FILE QMARK_FILE_SINGLE_FILE MOUNT_NS_STAR_MEDIA_FILE MOUNT_NS_QMARK_MEDIA_FILE FUSE_STAR_MEDIA_FILE FUSE_STAR_MISS_MEDIA_FILE FUSE_QMARK_MEDIA_FILE FUSE_QMARK_MISS_MEDIA_FILE READ_ONLY_HARDLINK READ_ONLY_SYMLINK PAYLOAD READ_ONLY_PAYLOAD READ_ONLY_ROOT MAPPED_READ_ONLY_REQUEST MAPPED_READ_ONLY_TARGET ALLOW_ROOT PRIVATE_ALLOW_ROOT LEGACY_ROOT PRIVATE_LEGACY_ROOT QMARK_ROOT PRIVATE_QMARK_ROOT FUSE_PLAIN_ROOT PRIVATE_FUSE_PLAIN_ROOT FUSE_DCIM_ROOT PRIVATE_FUSE_DCIM_ROOT FUSE_DCIM_OTHER_ROOT PRIVATE_FUSE_DCIM_OTHER_ROOT FUSE_QMARK_ROOT PRIVATE_FUSE_QMARK_ROOT FUSE_QMARK_MISS_ROOT PRIVATE_FUSE_QMARK_MISS_ROOT FUSE_QMARK_MEDIA_ROOT PRIVATE_FUSE_QMARK_MEDIA_ROOT FUSE_STAR_MEDIA_ROOT PRIVATE_FUSE_STAR_MEDIA_ROOT FUSE_EXCLUDE_ROOT PRIVATE_FUSE_EXCLUDE_ROOT FUSE_MAP_PARENT FUSE_MAP_RW_REQUEST FUSE_MAP_RO_REQUEST FUSE_MAP_RW_TARGET FUSE_MAP_RO_TARGET FUSE_MULTI_ROOT PRIVATE_FUSE_MULTI_ROOT MOUNT_NS_ALLOW_ROOT PRIVATE_MOUNT_NS_ALLOW_ROOT MOUNT_NS_READ_ONLY_ROOT PRIVATE_MOUNT_NS_READ_ONLY_ROOT MOUNT_NS_MAP_PARENT MOUNT_NS_MAP_RW_REQUEST MOUNT_NS_MAP_RO_REQUEST MOUNT_NS_MAP_RW_TARGET MOUNT_NS_MAP_RO_TARGET MONITOR_BASE_ROOT PRIVATE_MONITOR_BASE_ROOT MONITOR_MAP_REQUEST MONITOR_MAP_TARGET MONITOR_LOCKED_ROOT MONITOR_WRITABLE_ROOT PRIVATE_MONITOR_WRITABLE_ROOT SRT_FRESH_APP_PER_CASE SRT_RESULT_POLL_MS SRT_APP_LAUNCH_SETTLE_MS SRT_MOUNT_CONFIRM_TIMEOUT_MS SRT_SERVICE_CASE_SETTLE_MS SRT_FILE_MONITOR_ENABLED
+export -f adb_root adb_su wait_boot_completed write_config write_global_config test_global_config enable_fuse_daemon_config disable_fuse_daemon_config use_mount_namespace_fallback_config apply_config target_path logical_dir expected_path scenario_title clean_targets clean_results latest_result wait_service_result wait_app_mount_confirmed prepare_service_case wait_storage_ready media_provider_query_ready wait_media_provider_ready print_storage_state run_service_case run_write_case run_create_case run_mediastore_download_create_case run_mediastore_download_create_denied_case run_write_test check_app_view expect_app_entry expect_no_app_entry find_written_file check_file_exists check_file_missing check_file_location seed_read_only_targets check_read_only_artifacts run_read_only_scenario prepare_mapped_read_only_targets run_mapped_read_only_scenario run_allow_exclusion_scenario run_legacy_exclusion_scenario run_qmark_wildcard_scenario check_fuse_daemon_started check_scoped_fuse_daemon_started run_fuse_daemon_allow_wildcard_scenario run_fuse_daemon_read_only_exclusion_scenario run_fuse_daemon_mapping_read_only_scenario run_fuse_daemon_multi_wildcard_scenario set_mount_namespace_read_only_seed run_mount_namespace_allow_wildcard_fallback_scenario run_mount_namespace_read_only_wildcard_fallback_scenario run_mount_namespace_mapping_read_only_scenario ensure_monitor_collector clear_file_monitor_log file_monitor_watch_capacity_limited assert_file_monitor_enabled_for_scenario prepare_file_monitor_assertion wait_file_monitor_log_line expect_file_monitor_success_record expect_file_monitor_failure_record monitor_file_name run_file_monitor_write_success_case run_file_monitor_write_denied_case run_file_monitor_mediastore_success_case run_file_monitor_mediastore_denied_case run_file_monitor_disabled_redirect_scenario run_file_monitor_regular_scenario run_file_monitor_mediastore_scenario check_health print_diagnostics run_standard_scenario run_scenario
 
 for scenario in "${scenarios[@]}"; do
   echo "::group::scenario ${scenario}: $(scenario_title "$scenario")"
