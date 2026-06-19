@@ -115,13 +115,15 @@ function Invoke-Adb {
 
 function Invoke-Su {
     param([string]$Command)
-    $escaped = $Command.Replace("'", "'\''")
+    $normalized = $Command.Replace("`r", "")
+    $escaped = $normalized.Replace("'", "'\''")
     & adb -s $Serial shell "su -c '$escaped'" | ForEach-Object { $_ -replace "`r", "" }
 }
 
 function Test-Su {
     param([string]$Command)
-    $escaped = $Command.Replace("'", "'\''")
+    $normalized = $Command.Replace("`r", "")
+    $escaped = $normalized.Replace("'", "'\''")
     & adb -s $Serial shell "su -c '$escaped'" | Out-Null
     $LASTEXITCODE -eq 0
 }
