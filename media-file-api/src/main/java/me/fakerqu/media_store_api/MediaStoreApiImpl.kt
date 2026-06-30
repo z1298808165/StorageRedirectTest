@@ -2,11 +2,14 @@ package me.fakerqu.media_store_api
 
 import android.app.RecoverableSecurityException
 import android.content.ContentValues
+import android.content.ContentResolver
 import android.content.Context
 import android.database.Cursor
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Bundle
 import android.os.Environment
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.util.Size
 import android.webkit.MimeTypeMap
@@ -14,6 +17,9 @@ import androidx.core.database.getBlobOrNull
 import androidx.core.database.getFloatOrNull
 import androidx.core.database.getIntOrNull
 import androidx.core.database.getStringOrNull
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.InputStream
 
 class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
@@ -43,17 +49,46 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
     }
 
     override fun readMedia(uri: Uri): InputStream? {
-        return context.contentResolver.openInputStream(uri)
+        openMediaReadDescriptor(uri)?.let { fd ->
+            return ParcelFileDescriptor.AutoCloseInputStream(fd)
+        }
+        try {
+            context.contentResolver.openInputStream(uri)?.let { return it }
+        } catch (_: Exception) {
+        }
+        return resolveMediaDataPath(uri)?.let { path ->
+            try {
+                FileInputStream(File(path))
+            } catch (_: Exception) {
+                null
+            }
+        }
     }
 
     override fun writeMedia(uri: Uri, content: ByteArray): Boolean {
-        return try {
+        openMediaWriteDescriptor(uri)?.use { fd ->
+            ParcelFileDescriptor.AutoCloseOutputStream(fd).use {
+                it.write(content)
+                it.flush()
+            }
+            return true
+        }
+        try {
             context.contentResolver.openOutputStream(uri, "wt")?.use {
                 it.write(content)
                 it.flush()
-                true
-            } ?: false
-        } catch (e: Exception) {
+                return true
+            }
+        } catch (_: Exception) {
+        }
+        val path = resolveMediaDataPath(uri) ?: return false
+        return try {
+            FileOutputStream(File(path), false).use {
+                it.write(content)
+                it.flush()
+            }
+            true
+        } catch (_: Exception) {
             false
         }
     }
@@ -63,7 +98,8 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
         volumeType: IMediaStoreApi.VolumeType,
         fileName: String,
         content: ByteArray,
-        relativePath: String?
+        relativePath: String?,
+        keepPending: Boolean
     ): Uri? {
         if (fileName.isBlank() || content.isEmpty()) return null
         val collectionUri = resolveCollectionUri(mediaType, volumeType)
@@ -88,9 +124,11 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
             null
         } ?: return null
         val written = try {
-            context.contentResolver.openOutputStream(uri, "w")?.use { stream ->
-                stream.write(content)
-                stream.flush()
+            context.contentResolver.openFileDescriptor(uri, "w")?.use { fd ->
+                ParcelFileDescriptor.AutoCloseOutputStream(fd).use { stream ->
+                    stream.write(content)
+                    stream.flush()
+                }
                 true
             } ?: false
         } catch (_: Exception) {
@@ -103,21 +141,26 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
             }
             return null
         }
-        val publishedValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.IS_PENDING, 0)
-            put(MediaStore.MediaColumns.SIZE, content.size.toLong())
-        }
-        return try {
-            context.contentResolver.update(uri, publishedValues, null, null)
-            uri
-        } catch (_: Exception) {
-            try {
-                context.contentResolver.delete(uri, null, null)
-            } catch (_: Exception) {
+        if (!keepPending) {
+            val publishedValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.IS_PENDING, 0)
+                put(MediaStore.MediaColumns.SIZE, content.size.toLong())
             }
-            deleteExistingMediaRows(collectionUri, targetRelativePath, fileName)
-            null
+            return try {
+                context.contentResolver.update(uri, publishedValues, null, null)
+                uri
+            } catch (_: Exception) {
+                try {
+                    context.contentResolver.delete(uri, null, null)
+                } catch (_: Exception) {
+                }
+                deleteExistingMediaRows(collectionUri, targetRelativePath, fileName)
+                null
+            }
         }
+        // Keep the row pending so the owning app can immediately re-open the URI
+        // for read/write smoke tests before the media scanner re-indexes it.
+        return uri
     }
 
     private fun deleteExistingMediaRows(collectionUri: Uri, relativePath: String, fileName: String) {
@@ -140,6 +183,22 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
             )
         } catch (_: Exception) {
         }
+    }
+
+    private fun openMediaReadDescriptor(uri: Uri): ParcelFileDescriptor? =
+        openMediaDescriptor(uri, listOf("r", "rw"))
+
+    private fun openMediaWriteDescriptor(uri: Uri): ParcelFileDescriptor? =
+        openMediaDescriptor(uri, listOf("rwt", "wt", "w"))
+
+    private fun openMediaDescriptor(uri: Uri, modes: List<String>): ParcelFileDescriptor? {
+        for (mode in modes) {
+            try {
+                context.contentResolver.openFileDescriptor(uri, mode)?.let { return it }
+            } catch (_: Exception) {
+            }
+        }
+        return null
     }
 
     private fun resolveCollectionUri(
@@ -183,6 +242,49 @@ class MediaStoreApiImpl(private val context: Context) : IMediaStoreApi {
             IMediaStoreApi.MediaType.FILE -> "${Environment.DIRECTORY_DOCUMENTS}/"
             IMediaStoreApi.MediaType.DOWNLOAD -> "${Environment.DIRECTORY_DOWNLOADS}/"
         }
+
+    private fun resolveMediaDataPath(uri: Uri): String? {
+        val itemId = uri.lastPathSegment ?: return null
+        val queryArgs = Bundle().apply {
+            putInt(MediaStore.QUERY_ARG_MATCH_PENDING, MediaStore.MATCH_INCLUDE)
+            putString(
+                ContentResolver.QUERY_ARG_SQL_SELECTION,
+                "_id=?",
+            )
+            putStringArray(
+                ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,
+                arrayOf(itemId),
+            )
+        }
+        val collectionUri = uri.toCollectionUri() ?: uri
+        return try {
+            context.contentResolver.query(
+                collectionUri,
+                arrayOf(MediaStore.MediaColumns.DATA),
+                queryArgs,
+                null,
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    cursor.getStringOrNull(0)
+                } else {
+                    null
+                }
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun Uri.toCollectionUri(): Uri? {
+        val segments = pathSegments
+        if (segments.size < 2) return null
+        val collectionSegments = segments.dropLast(1)
+        return buildUpon()
+            .path("/${collectionSegments.joinToString("/")}")
+            .query(null)
+            .fragment(null)
+            .build()
+    }
 
     private fun normalizeRelativePath(relativePath: String?): String? {
         val cleaned = relativePath

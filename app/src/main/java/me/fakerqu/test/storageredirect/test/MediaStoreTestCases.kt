@@ -193,7 +193,14 @@ class MediaStoreTestCases(context: Context) {
     ): TestResult = testCase.measure {
         val payload = args.payloadOr(TestFixtures.initialPayload(mediaType))
         val fileName = args.fileName ?: TestFixtures.fileName(mediaType)
-        val uri = api.createMedia(mediaType, volume, fileName, payload, args.relativePath)
+        val uri = api.createMedia(
+            mediaType,
+            volume,
+            fileName,
+            payload,
+            args.relativePath,
+            args.keepPending,
+        )
             ?: return@measure testCase.fail("createMedia returned null")
         testCase.pass(
             message = "create succeeded",
@@ -212,7 +219,14 @@ class MediaStoreTestCases(context: Context) {
     ): TestResult = testCase.measure {
         val payload = args.payloadOr(TestFixtures.initialPayload(mediaType))
         val fileName = args.fileName ?: TestFixtures.fileName(mediaType)
-        val uri = api.createMedia(mediaType, volume, fileName, payload, args.relativePath)
+        val uri = api.createMedia(
+            mediaType,
+            volume,
+            fileName,
+            payload,
+            args.relativePath,
+            args.keepPending,
+        )
         if (uri != null) {
             return@measure testCase.fail(
                 message = "createMedia unexpectedly succeeded",
@@ -323,12 +337,12 @@ class MediaStoreTestCases(context: Context) {
         var lastError: Exception? = null
         repeat(IO_RETRY_COUNT) { index ->
             try {
-                return api.readMedia(uri)?.use { it.readBytes() }
+                api.readMedia(uri)?.use { return it.readBytes() }
             } catch (e: Exception) {
                 lastError = e
-                if (index < IO_RETRY_COUNT - 1) {
-                    Thread.sleep(IO_RETRY_DELAY_MS)
-                }
+            }
+            if (index < IO_RETRY_COUNT - 1) {
+                Thread.sleep(IO_RETRY_DELAY_MS)
             }
         }
         lastError?.let { throw it }

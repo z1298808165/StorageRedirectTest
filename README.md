@@ -28,20 +28,14 @@ me.fakerqu.test.storageredirect
 - Android SDK / platform-tools，确保 `adb` 可用。
 - Gradle Wrapper 使用本仓库的 `gradlew.bat` 或 `./gradlew`。
 - 需要一台可用 root 的测试设备或模拟器，并已刷入 Storage Redirect X 模块。
-- 如果要验证本地 `srx_core` 修改，先从 `C:\Users\12988\Desktop\srx_core` 构建并刷入本地模块包。
+- 默认设备侧测试使用设备上当前已安装的模块，不主动编译、刷入本地 `srx_core`，也不因此重启设备。
+- 只有在用户明确要求编译/刷入本地模块，或明确说明要验证当前本地 `srx_core` 模块产物时，才从 `C:\Users\12988\Desktop\srx_core` 构建并刷入本地模块包。
 
 本项目已优先使用国内下载源：Gradle Wrapper 使用腾讯 Gradle 镜像，Gradle daemon JDK 21 使用清华 TUNA Adoptium 镜像，Maven/插件依赖优先走阿里云和腾讯 Maven 镜像，官方源仅作为兜底。
 
 ## 本地快速使用
 
-先构建并刷入本地 `srx_core` 模块：
-
-```powershell
-cd C:\Users\12988\Desktop\srx_core
-.\scripts\build-local-module.ps1
-```
-
-模块更新后需要重启设备。重启完成后确认模块存在：
+先确认设备在线、root 可用，并记录当前已安装模块版本。默认不重新编译或刷入模块：
 
 ```powershell
 adb wait-for-device
@@ -54,6 +48,15 @@ adb shell "su -c 'cat /data/adb/modules/storage.redirect.x/module.prop'"
 cd C:\Users\12988\Desktop\StorageRedirectTest
 .\gradlew.bat --no-daemon :app:testDebugUnitTest :media-file-api:testDebugUnitTest :app:assembleDebug
 adb install -r app\build\outputs\apk\debug\app-debug.apk
+```
+
+如用户明确要求验证本地 `srx_core` 模块产物，则先构建并刷入模块。模块更新后需要重启设备，重启完成后重新确认 `module.prop`：
+
+```powershell
+cd C:\Users\12988\Desktop\srx_core
+.\scripts\build-local-module.ps1
+adb wait-for-device
+adb shell "su -c 'cat /data/adb/modules/storage.redirect.x/module.prop'"
 ```
 
 授予测试 App 必要权限：
@@ -172,6 +175,7 @@ adb shell am start-foreground-service -n me.fakerqu.test.storageredirect/.TestSe
 - `file_dir`：目录列表和 mkdir 类用例的目标目录。
 - `file_name`：MediaStore 创建用例的文件名，或 `mediastore_query_path_*` 用例用于定位目标行的文件名。
 - `relative_path`：MediaStore 创建用例写入的相对目录，例如 `Download/SrtMonitor`；未传入时使用媒体类型默认目录。
+- `keep_pending`：MediaStore 创建用例是否保留 `IS_PENDING=1`；支持 `1`、`true`、`yes`，用于创建后立即由同一测试 APP 继续读写 URI。
 - `payload`：写入内容。
 - `expected_payload`：读回校验内容。
 - `expected_path`：`file_readlink` 的期望链接目标，或 `mediastore_query_path_*` 的期望 cursor `DATA` 路径。
@@ -238,7 +242,7 @@ GitHub Actions 当前会：
 - root 模拟器、安装 Magisk、安装 Storage Redirect X 模块、安装测试 App。
 - 执行 `.github/scripts/run-storage-redirect-scenarios.sh`。
 
-注意：当前 CI 默认验证的是上游 Release 模块，不会自动使用本地 `C:\Users\12988\Desktop\srx_core` 的未发布修改。本地验证 `srx_core` 改动时，以本 README 的本地快速使用流程为准。
+注意：当前 CI 默认验证的是上游 Release 模块，不会自动使用本地 `C:\Users\12988\Desktop\srx_core` 的未发布修改。本地设备侧测试默认也使用当前设备已安装模块；只有在用户明确要求编译/刷入，或明确说明要验证本地模块产物时，才按本 README 的可选步骤构建并刷入 `srx_core`。
 
 ## 维护和提交规则
 

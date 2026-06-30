@@ -60,7 +60,7 @@ class StorageRedirectTestRunner(private val context: Context) {
 
             for ((mediaType, chain) in mediaTypes) {
                 val createCase = chain.first()
-                val createResult = runLogged(createCase, overrides)
+                val createResult = runLogged(createCase, overrides.copy(keepPending = true))
                 results += createResult
                 val uri = createResult.metadata["uri"]?.let(Uri::parse)
                 if (uri == null) {

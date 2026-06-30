@@ -40,4 +40,4 @@ C:\Users\12988\Desktop\srx_core
 .\gradlew.bat --no-daemon :app:testDebugUnitTest :media-file-api:testDebugUnitTest :app:assembleDebug
 ```
 
-本地验证 `srx_core` 改动时，先在 `C:\Users\12988\Desktop\srx_core` 构建并刷入模块，再安装本测试 App，按 `README.md` 运行 `TestService` 用例或 CI 场景脚本。
+设备侧测试默认使用设备当前已安装的 Storage Redirect X 模块；不要主动编译、刷入本地 `srx_core` 或因此重启设备，除非用户明确要求编译/刷入模块，或明确说明要验证当前本地模块产物。需要刷模块时，按 `README.md` 的可选本地模块步骤执行。
